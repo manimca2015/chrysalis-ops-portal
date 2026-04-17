@@ -67,3 +67,43 @@ export interface Task {
   createdAt: any;
   updatedAt: any;
 }
+
+// Module 3: Costing Types
+export interface Supplier {
+  id: string;
+  name: string;
+  category: string;
+  email?: string;
+  phone?: string;
+  baseCurrency: string;
+  notes?: string;
+}
+
+export interface CostingItem {
+  id: string;
+  costingSetId: string;
+  supplierId?: string;
+  supplierName: string;
+  description: string;
+  unitCost: number;
+  quantity: number;
+  currency: string;
+  exchangeRate: number;
+  markupPercent: number;
+  isManualOverride: boolean;
+  totalCostSgd: number;
+  sellingPriceSgd: number;
+}
+
+export interface CostingSet {
+  id: string;
+  projectId: string;
+  name: string; // e.g. "Budget Option", "Premium Option"
+  isWinningOption: boolean;
+  totalCostSgd: number;
+  totalSellingSgd: number;
+  profitSgd: number;
+  marginPercent: number;
+  createdAt: any;
+  updatedAt: any;
+}

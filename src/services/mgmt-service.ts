@@ -13,9 +13,20 @@ import {
   getDoc,
   setDoc,
   arrayUnion,
+  deleteDoc,
   Timestamp
 } from 'firebase/firestore';
-import { Project, Task, ProjectStatus, StaffProfile, ProjectActivity, ProjectAssignment } from '@/types';
+import { 
+  Project, 
+  Task, 
+  ProjectStatus, 
+  StaffProfile, 
+  ProjectActivity, 
+  ProjectAssignment,
+  CostingSet,
+  CostingItem,
+  Supplier
+} from '@/types';
 
 const { db } = initializeFirebase();
 
@@ -42,7 +53,6 @@ export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'up
     updatedAt: serverTimestamp(),
   });
   
-  // Create initial activity log
   await addProjectActivity(docRef.id, {
     type: 'system',
     content: `Project created with status: ${data.status}`,
@@ -96,6 +106,69 @@ export const assignStaffToProject = async (projectId: string, assignment: Projec
     authorId,
     authorName
   });
+};
+
+// Costing Engine
+export const getCostingSets = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_costing_sets'), where('projectId', '==', projectId), orderBy('createdAt', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
+};
+
+export const createCostingSet = async (projectId: string, name: string) => {
+  return await addDoc(collection(db, 'mgmt_costing_sets'), {
+    projectId,
+    name,
+    isWinningOption: false,
+    totalCostSgd: 0,
+    totalSellingSgd: 0,
+    profitSgd: 0,
+    marginPercent: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getCostingItems = async (setId: string) => {
+  const q = query(collection(db, 'mgmt_costing_items'), where('costingSetId', '==', setId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingItem[];
+};
+
+export const addCostingItem = async (setId: string, item: Omit<CostingItem, 'id' | 'costingSetId'>) => {
+  const docRef = await addDoc(collection(db, 'mgmt_costing_items'), {
+    ...item,
+    costingSetId: setId,
+  });
+  await recalculateCostingSet(setId);
+  return docRef;
+};
+
+export const deleteCostingItem = async (setId: string, itemId: string) => {
+  await deleteDoc(doc(db, 'mgmt_costing_items', itemId));
+  await recalculateCostingSet(setId);
+};
+
+const recalculateCostingSet = async (setId: string) => {
+  const items = await getCostingItems(setId);
+  const totalCost = items.reduce((sum, item) => sum + item.totalCostSgd, 0);
+  const totalSelling = items.reduce((sum, item) => sum + item.sellingPriceSgd, 0);
+  const profit = totalSelling - totalCost;
+  const margin = totalSelling > 0 ? (profit / totalSelling) * 100 : 0;
+
+  await updateDoc(doc(db, 'mgmt_costing_sets', setId), {
+    totalCostSgd: totalCost,
+    totalSellingSgd: totalSelling,
+    profitSgd: profit,
+    marginPercent: margin,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getSuppliers = async () => {
+  const q = query(collection(db, 'mgmt_suppliers'), orderBy('name', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
 };
 
 // Activity Log

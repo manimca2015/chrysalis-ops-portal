@@ -35,7 +35,7 @@ export interface ProjectAssignment {
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update';
   content: string;
   authorId: string;
   authorName: string;
@@ -55,15 +55,32 @@ export interface Project {
   updatedAt: any;
 }
 
+export interface SubTask {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+}
+
+export interface TaskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  timestamp: any;
+}
+
 export interface Task {
   id: string;
   projectId: string;
   title: string;
   description?: string;
-  assignedTo?: string; // staffId
-  status: 'pending' | 'ready_for_verification' | 'approved' | 'rejected' | 'completed';
+  assignedToId?: string;
+  assignedToName?: string;
+  verifierId?: string;
+  status: 'pending' | 'ready_for_verification' | 'completed';
   priority: 'low' | 'medium' | 'high';
   dueDate?: any;
+  subTasks: SubTask[];
   createdAt: any;
   updatedAt: any;
 }
@@ -98,7 +115,7 @@ export interface CostingItem {
 export interface CostingSet {
   id: string;
   projectId: string;
-  name: string; // e.g. "Budget Option", "Premium Option"
+  name: string; 
   isWinningOption: boolean;
   totalCostSgd: number;
   totalSellingSgd: number;

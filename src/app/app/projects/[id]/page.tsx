@@ -3,7 +3,7 @@
 
 import React, { use } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProjectById, updateProjectStatus, getProjectActivity, getStaffProfiles, assignStaffToProject } from '@/services/mgmt-service';
+import { getProjectById, updateProjectStatus, getProjectActivity, getStaffProfiles, getProjectTasks } from '@/services/mgmt-service';
 import { ProjectStatus, ProjectAssignment } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,12 +31,14 @@ import {
   History,
   Info,
   Users as UsersIcon,
-  ChevronRight
+  ChevronRight,
+  ListTodo
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 const STATUS_STEPS: ProjectStatus[] = [
   'enquiry',
@@ -63,9 +65,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     queryFn: () => getProjectActivity(id),
   });
 
-  const { data: staffList } = useQuery({
-    queryKey: ['staff'],
-    queryFn: getStaffProfiles,
+  const { data: tasks } = useQuery({
+    queryKey: ['tasks', id],
+    queryFn: () => getProjectTasks(id),
   });
 
   const statusMutation = useMutation({
@@ -95,6 +97,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const currentStatusIndex = STATUS_STEPS.indexOf(project.status);
+  const taskProgress = tasks ? (tasks.filter(t => t.status === 'completed').length / (tasks.length || 1)) * 100 : 0;
 
   return (
     <div className="space-y-8">
@@ -165,17 +168,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content (Left) */}
         <div className="lg:col-span-2 space-y-8">
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="bg-muted/50 p-1">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="details">Project Details</TabsTrigger>
               <TabsTrigger value="team">Team Assignments</TabsTrigger>
               <TabsTrigger value="activity">Activity Log</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview">
+            <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="shadow-sm">
                   <CardHeader className="pb-2">
@@ -193,11 +194,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Mail size={12} /> {project.customerDetails.email}
                         </p>
-                        {project.customerDetails.phone && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Phone size={12} /> {project.customerDetails.phone}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -206,32 +202,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 <Card className="shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <Info className="text-primary" size={16} /> Quick Stats
+                       <ListTodo className="text-primary" size={16} /> Task Progress
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Created On</span>
-                      <span className="font-medium">
-                        {project.createdAt ? format(project.createdAt.toDate(), 'dd MMM yyyy') : '-'}
-                      </span>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold">
+                        <span>Overall Checklist</span>
+                        <span>{Math.round(taskProgress)}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-accent" style={{ width: `${taskProgress}%` }} />
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Last Updated</span>
-                      <span className="font-medium text-accent">
-                        {project.updatedAt ? format(project.updatedAt.toDate(), 'dd MMM yyyy HH:mm') : '-'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Assigned Members</span>
-                      <span className="font-medium">{project.teamAssignments?.length || 0}</span>
-                    </div>
+                    <Button variant="link" className="p-0 h-auto text-xs" asChild>
+                      <Link href={`/app/projects/${id}/tasks`}>View full checklist</Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </div>
 
               {project.notes && (
-                <Card className="mt-6 shadow-sm">
+                <Card className="shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-sm">Enquiry Notes</CardTitle>
                   </CardHeader>
@@ -251,9 +243,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <CardTitle className="text-lg">Project Team</CardTitle>
                     <CardDescription>Assign roles for this specific project.</CardDescription>
                   </div>
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <UserPlus size={16} /> Manage Team
-                  </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y">
@@ -301,6 +290,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           <div className="mt-1">
                             {item.type === 'status_change' ? <Clock size={16} className="text-blue-500" /> : 
                              item.type === 'assignment' ? <UsersIcon size={16} className="text-purple-500" /> : 
+                             item.type === 'task_update' ? <ListTodo size={16} className="text-orange-500" /> :
                              <Info size={16} className="text-muted-foreground" />}
                           </div>
                           <div className="space-y-1">
@@ -321,39 +311,29 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </Tabs>
         </div>
 
-        {/* Sidebar Content (Right) */}
         <div className="space-y-6">
           <Card className="shadow-md border-none overflow-hidden">
             <div className="h-2 bg-accent" />
             <CardHeader>
-              <CardTitle className="text-lg">Next Steps</CardTitle>
-              <CardDescription>Required actions for current phase</CardDescription>
+              <CardTitle className="text-lg">Command Center</CardTitle>
+              <CardDescription>Actions for {project.status.replace('_', ' ')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button variant="outline" className="w-full justify-between group" asChild>
-                <a href={`/app/projects/${id}/costing`}>
-                  Prepare Costing Options <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </a>
+                <Link href={`/app/projects/${id}/costing`}>
+                  Costing Engine <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-between group">
-                Review Checklist <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              <Button variant="outline" className="w-full justify-between group" asChild>
+                <Link href={`/app/projects/${id}/quotation`}>
+                  Quotation Builder <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
               </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm">External Reference</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 bg-muted/50 rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">Chrysalis Booking Link</p>
-                {project.chrysalisBookingId ? (
-                  <Button variant="link" className="p-0 h-auto text-sm">View Linked Booking</Button>
-                ) : (
-                  <p className="text-sm font-medium">Not Linked</p>
-                )}
-              </div>
+              <Button variant="default" className="w-full justify-between group bg-primary text-primary-foreground" asChild>
+                <Link href={`/app/projects/${id}/tasks`}>
+                  Project Checklist <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         </div>

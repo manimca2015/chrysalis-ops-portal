@@ -27,7 +27,9 @@ import {
   CostingItem,
   Supplier,
   DocumentMetadata,
-  PaymentPlan
+  PaymentPlan,
+  SubTask,
+  TaskComment
 } from '@/types';
 
 const { db } = initializeFirebase();
@@ -188,7 +190,7 @@ export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' |
 };
 
 export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan, 'id' | 'updatedAt'>) => {
-  const planRef = doc(db, 'mgmt_payment_plans', projectId); // One plan per project for now
+  const planRef = doc(db, 'mgmt_payment_plans', projectId); 
   return await setDoc(planRef, {
     ...plan,
     updatedAt: serverTimestamp(),
@@ -218,7 +220,7 @@ export const getProjectActivity = async (projectId: string) => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
 };
 
-// Tasks
+// Module 5: Task Management
 export const getProjectTasks = async (projectId: string) => {
   const q = query(
     collection(db, 'mgmt_tasks'), 
@@ -235,4 +237,39 @@ export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedA
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+};
+
+export const updateTask = async (taskId: string, data: Partial<Task>, authorId: string, authorName: string) => {
+  const taskRef = doc(db, 'mgmt_tasks', taskId);
+  await updateDoc(taskRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+
+  // Log to project activity if status changed
+  if (data.status) {
+    const taskSnap = await getDoc(taskRef);
+    const projectId = taskSnap.data()?.projectId;
+    if (projectId) {
+      await addProjectActivity(projectId, {
+        type: 'task_update',
+        content: `Task "${taskSnap.data()?.title}" status updated to ${data.status.replace('_', ' ')}`,
+        authorId,
+        authorName
+      });
+    }
+  }
+};
+
+export const addTaskComment = async (taskId: string, comment: Omit<TaskComment, 'id' | 'timestamp'>) => {
+  return await addDoc(collection(db, 'mgmt_tasks', taskId, 'comments'), {
+    ...comment,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const getTaskComments = async (taskId: string) => {
+  const q = query(collection(db, 'mgmt_tasks', taskId, 'comments'), orderBy('timestamp', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TaskComment[];
 };

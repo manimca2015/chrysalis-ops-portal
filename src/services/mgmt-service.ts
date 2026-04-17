@@ -1,0 +1,65 @@
+import { db } from '@/lib/firebase';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy, 
+  doc, 
+  updateDoc, 
+  serverTimestamp,
+  getDoc,
+  onSnapshot
+} from 'firebase/firestore';
+import { Project, Task, ProjectStatus } from '@/types';
+
+// Projects
+export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_projects'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getProjects = async () => {
+  const q = query(collection(db, 'mgmt_projects'), orderBy('updatedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
+};
+
+export const updateProjectStatus = async (projectId: string, status: ProjectStatus) => {
+  const projectRef = doc(db, 'mgmt_projects', projectId);
+  return await updateDoc(projectRef, {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Tasks
+export const getProjectTasks = async (projectId: string) => {
+  const q = query(
+    collection(db, 'mgmt_tasks'), 
+    where('projectId', '==', projectId),
+    orderBy('dueDate', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+};
+
+export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_tasks'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Read-only helpers for Chrysalis collections
+export const getChrysalisUser = async (email: string) => {
+  const q = query(collection(db, 'users'), where('email', '==', email));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  return snapshot.docs[0].data();
+};

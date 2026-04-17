@@ -1,0 +1,56 @@
+
+{
+  "entities": {
+    "StaffProfile": {
+      "title": "Staff Profile",
+      "description": "Internal staff member profile for the management portal.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "staff"] },
+        "avatarUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "name", "role"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Central project record for tour operations.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "customerDetails": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "phone": { "type": "string" }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "enquiry", "costing", "quotation_sent", "confirmed", "in_progress", "completed", "archived"]
+        },
+        "category": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/mgmt_staff/{userId}": {
+      "schema": "StaffProfile",
+      "description": "Profiles for management portal staff."
+    },
+    "/mgmt_projects/{projectId}": {
+      "schema": "Project",
+      "description": "Project records managed by staff."
+    }
+  }
+}

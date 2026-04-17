@@ -29,7 +29,17 @@ export interface CustomerDetails {
 
 export interface ProjectAssignment {
   staffId: string;
+  staffName: string;
   role: 'Senior Staff' | 'Team Lead' | 'Assisting Member';
+}
+
+export interface ProjectActivity {
+  id: string;
+  type: 'status_change' | 'assignment' | 'note' | 'system';
+  content: string;
+  authorId: string;
+  authorName: string;
+  timestamp: any;
 }
 
 export interface Project {
@@ -38,7 +48,7 @@ export interface Project {
   customerDetails: CustomerDetails;
   status: ProjectStatus;
   teamAssignments: ProjectAssignment[];
-  category: string;
+  category: 'custom-tour' | 'corporate' | 'transport' | 'education';
   notes?: string;
   chrysalisBookingId?: string;
   createdAt: any;

@@ -11,9 +11,11 @@ import {
   updateDoc, 
   serverTimestamp,
   getDoc,
-  setDoc
+  setDoc,
+  arrayUnion,
+  Timestamp
 } from 'firebase/firestore';
-import { Project, Task, ProjectStatus, StaffProfile } from '@/types';
+import { Project, Task, ProjectStatus, StaffProfile, ProjectActivity, ProjectAssignment } from '@/types';
 
 const { db } = initializeFirebase();
 
@@ -29,17 +31,26 @@ export const upsertStaffProfile = async (uid: string, data: Partial<StaffProfile
   return await setDoc(staffRef, {
     ...data,
     updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
   }, { merge: true });
 };
 
 // Projects
 export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-  return await addDoc(collection(db, 'mgmt_projects'), {
+  const docRef = await addDoc(collection(db, 'mgmt_projects'), {
     ...data,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  
+  // Create initial activity log
+  await addProjectActivity(docRef.id, {
+    type: 'system',
+    content: `Project created with status: ${data.status}`,
+    authorId: 'system',
+    authorName: 'System'
+  });
+
+  return docRef;
 };
 
 export const getProjects = async () => {
@@ -57,12 +68,48 @@ export const getProjectById = async (id: string) => {
   return null;
 };
 
-export const updateProjectStatus = async (projectId: string, status: ProjectStatus) => {
+export const updateProjectStatus = async (projectId: string, status: ProjectStatus, authorId: string, authorName: string) => {
   const projectRef = doc(db, 'mgmt_projects', projectId);
-  return await updateDoc(projectRef, {
+  await updateDoc(projectRef, {
     status,
     updatedAt: serverTimestamp(),
   });
+
+  await addProjectActivity(projectId, {
+    type: 'status_change',
+    content: `Status updated to ${status.replace('_', ' ')}`,
+    authorId,
+    authorName
+  });
+};
+
+export const assignStaffToProject = async (projectId: string, assignment: ProjectAssignment, authorId: string, authorName: string) => {
+  const projectRef = doc(db, 'mgmt_projects', projectId);
+  await updateDoc(projectRef, {
+    teamAssignments: arrayUnion(assignment),
+    updatedAt: serverTimestamp(),
+  });
+
+  await addProjectActivity(projectId, {
+    type: 'assignment',
+    content: `Assigned ${assignment.staffName} as ${assignment.role}`,
+    authorId,
+    authorName
+  });
+};
+
+// Activity Log
+export const addProjectActivity = async (projectId: string, activity: Omit<ProjectActivity, 'id' | 'timestamp'>) => {
+  return await addDoc(collection(db, 'mgmt_projects', projectId, 'activity'), {
+    ...activity,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const getProjectActivity = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_projects', projectId, 'activity'), orderBy('timestamp', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
 };
 
 // Tasks
@@ -82,24 +129,4 @@ export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedA
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-};
-
-// Read-only helpers for Chrysalis collections (Production Safety)
-export const getChrysalisUserById = async (uid: string) => {
-  const docRef = doc(db, 'users', uid);
-  const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? docSnap.data() : null;
-};
-
-export const getChrysalisUserByEmail = async (email: string) => {
-  const q = query(collection(db, 'users'), where('email', '==', email));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  return snapshot.docs[0].data();
-};
-
-export const getChrysalisBooking = async (bookingId: string) => {
-  const docRef = doc(db, 'bookings', bookingId);
-  const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? docSnap.data() : null;
 };

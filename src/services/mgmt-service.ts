@@ -10,7 +10,8 @@ import {
   doc, 
   updateDoc, 
   serverTimestamp,
-  getDoc
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 import { Project, Task, ProjectStatus, StaffProfile } from '@/types';
 
@@ -21,6 +22,15 @@ export const getStaffProfiles = async () => {
   const q = query(collection(db, 'mgmt_staff'), orderBy('name', 'asc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StaffProfile[];
+};
+
+export const upsertStaffProfile = async (uid: string, data: Partial<StaffProfile>) => {
+  const staffRef = doc(db, 'mgmt_staff', uid);
+  return await setDoc(staffRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp(), // In a real app, you'd check if it exists first
+  }, { merge: true });
 };
 
 // Projects

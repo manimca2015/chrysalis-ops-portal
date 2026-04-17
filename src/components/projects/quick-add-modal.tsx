@@ -36,7 +36,7 @@ export function QuickAddProjectModal() {
     customerName: '',
     customerEmail: '',
     customerPhone: '',
-    category: 'custom-tour',
+    category: 'custom-tour' as any,
     summary: '',
   });
 
@@ -48,8 +48,13 @@ export function QuickAddProjectModal() {
       setOpen(false);
       resetForm();
     },
-    onError: () => {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to create project.' });
+    onError: (error: any) => {
+      console.error('Failed to create project:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Error', 
+        description: error.message || 'Failed to create project. Check console for details.' 
+      });
     }
   });
 
@@ -141,7 +146,7 @@ export function QuickAddProjectModal() {
                 <Label htmlFor="category">Category</Label>
                 <Select 
                   value={formData.category} 
-                  onValueChange={(v) => setFormData({...formData, category: v})}
+                  onValueChange={(v) => setFormData({...formData, category: v as any})}
                 >
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Select category" />

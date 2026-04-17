@@ -79,20 +79,29 @@ export const updateEnquiryStatus = async (enquiryId: string, status: 'converted'
 
 // Projects
 export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-  const docRef = await addDoc(collection(db, 'mgmt_projects'), {
-    ...data,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  
-  await addProjectActivity(docRef.id, {
-    type: 'system',
-    content: `Project created with status: ${data.status}`,
-    authorId: 'system',
-    authorName: 'System'
-  });
+  try {
+    const docRef = await addDoc(collection(db, 'mgmt_projects'), {
+      ...data,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    
+    try {
+      await addProjectActivity(docRef.id, {
+        type: 'system',
+        content: `Project created with status: ${data.status}`,
+        authorId: 'system',
+        authorName: 'System'
+      });
+    } catch (activityError) {
+      console.warn('Project created but failed to log initial activity:', activityError);
+    }
 
-  return docRef;
+    return docRef;
+  } catch (error) {
+    console.error('Error in createProject service:', error);
+    throw error;
+  }
 };
 
 export const getProjects = async () => {

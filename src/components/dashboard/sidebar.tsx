@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from 'next/link';
@@ -9,7 +10,7 @@ import {
   FolderKanban, 
   Users, 
   Settings, 
-  ChevronLeft,
+  ChevronLeft, 
   ChevronRight,
   LogOut,
   Workflow
@@ -31,7 +32,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { profile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -81,15 +82,14 @@ export function Sidebar() {
           collapsed ? "flex-col" : "flex-row"
         )}>
           <Avatar className="h-10 w-10">
-            <AvatarImage src={profile?.avatarUrl} />
             <AvatarFallback className="bg-accent text-accent-foreground font-bold">
-              {profile?.name?.charAt(0) || 'U'}
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-semibold">{profile?.name || 'User'}</p>
-              <p className="truncate text-xs text-muted-foreground capitalize">{profile?.role || 'Staff'}</p>
+              <p className="truncate text-sm font-semibold">{user?.email?.split('@')[0] || 'User'}</p>
+              <p className="truncate text-xs text-muted-foreground capitalize">Admin</p>
             </div>
           )}
           <Button 

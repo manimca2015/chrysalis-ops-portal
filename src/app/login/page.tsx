@@ -1,8 +1,8 @@
 
 "use client"
 
-import { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useState } from 'react';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -10,32 +10,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, AlertCircle, Database } from 'lucide-react';
-import { firebaseConfig } from '@/firebase/config';
+import { Loader2, ShieldCheck, Database } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [configStatus, setConfigStatus] = useState<'loading' | 'connected' | 'missing'>('loading');
   const router = useRouter();
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (firebaseConfig.projectId && firebaseConfig.projectId !== 'mock-project-id') {
-      setConfigStatus('connected');
-    } else {
-      setConfigStatus('missing');
-    }
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // 1. Client-side sign in
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // 2. Get ID token
+      const idToken = await user.getIdToken();
+
+      // 3. Request custom claim & set session cookie
+      const response = await fetch('/api/auth/set-mgmt-claim', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        await signOut(auth); // Sign out if claims/permissions fail
+        throw new Error(errorData.error || 'Access denied');
+      }
+
+      // 4. Force refresh token to get the new claim in client SDK
+      await user.getIdToken(true);
+
+      // 5. Success redirect
       router.push('/app/dashboard');
+      router.refresh(); // Ensure middleware picks up the new cookie
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -53,22 +67,10 @@ export default function LoginPage() {
         <CardHeader className="space-y-1">
           <div className="mb-4 flex flex-col items-center gap-2">
             <span className="text-3xl font-bold text-primary font-headline text-center">Chrysalis Portal</span>
-            
-            {configStatus === 'connected' ? (
-              <Badge variant="outline" className="flex items-center gap-1 text-[10px] py-0 px-2 text-emerald-600 border-emerald-200 bg-emerald-50">
-                <ShieldCheck size={10} />
-                Connected: {firebaseConfig.projectId}
-              </Badge>
-            ) : configStatus === 'missing' ? (
-              <Badge variant="destructive" className="flex items-center gap-1 text-[10px] py-0 px-2">
-                <AlertCircle size={10} />
-                Config Missing (.env)
-              </Badge>
-            ) : null}
           </div>
           <CardTitle className="text-2xl text-center">Staff Login</CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access the management dashboard.
+            Access strictly for Admin accounts with published status.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
@@ -81,6 +83,7 @@ export default function LoginPage() {
                 placeholder="staff@chrysalistours.sg" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
                 required 
               />
             </div>
@@ -91,25 +94,18 @@ export default function LoginPage() {
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
                 required 
               />
             </div>
-            {configStatus === 'missing' && (
-              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2 text-destructive">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <p className="text-xs font-medium">
-                  Firebase environment variables are not detected. Please check your .env file and restart the dev server.
-                </p>
-              </div>
-            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button className="w-full" type="submit" disabled={loading || configStatus === 'missing'}>
-              {loading ? "Signing in..." : "Sign In"}
+            <Button className="w-full" type="submit" disabled={loading}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Authenticating...</> : "Sign In"}
             </Button>
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Database size={10} />
-              <span>Using isolated mgmt_* collections</span>
+              <span>Isolated Management Portal</span>
             </div>
           </CardFooter>
         </form>

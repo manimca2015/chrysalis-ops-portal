@@ -6,7 +6,7 @@ import {
   User, 
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { MgmtRole, StaffProfile } from '@/types';
 import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   profile: StaffProfile | null;
   loading: boolean;
   role: MgmtRole | null;
+  error: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -28,25 +29,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<MgmtRole | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchProfile() {
       if (user) {
         try {
-          const idTokenResult = await user.getIdTokenResult();
-          const mgmtRole = idTokenResult.claims.mgmt_role as MgmtRole;
-          setRole(mgmtRole || 'staff');
-
           const profileDoc = await getDoc(doc(db, 'mgmt_staff', user.uid));
+          
           if (profileDoc.exists()) {
-            setProfile({ id: profileDoc.id, ...profileDoc.data() } as StaffProfile);
+            const data = profileDoc.data() as StaffProfile;
+            setProfile({ id: profileDoc.id, ...data });
+            setRole(data.role || 'staff');
+            setError(null);
+          } else {
+            // Profile missing in mgmt_staff
+            console.warn("User authenticated but no staff profile found in mgmt_staff.");
+            setProfile(null);
+            setRole(null);
+            setError("Your account is not registered as a Portal Staff member. Please contact an Administrator.");
           }
-        } catch (error) {
-          console.error("Error fetching staff profile:", error);
+        } catch (err: any) {
+          console.error("Error fetching staff profile:", err);
+          setError("Failed to verify your staff access. Please check your connection.");
         }
       } else {
         setProfile(null);
         setRole(null);
+        setError(null);
       }
       setLoading(false);
     }
@@ -59,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = () => firebaseSignOut(auth);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading: loading || authLoading, role, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading: loading || authLoading, role, error, signOut }}>
       {children}
     </AuthContext.Provider>
   );

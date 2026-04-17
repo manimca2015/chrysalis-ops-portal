@@ -29,7 +29,8 @@ import {
   DocumentMetadata,
   PaymentPlan,
   AuditEntry,
-  AuditEventType
+  AuditEventType,
+  Enquiry
 } from '@/types';
 
 const { db } = initializeFirebase();
@@ -56,6 +57,24 @@ export const upsertStaffProfile = async (uid: string, data: Partial<StaffProfile
     ...data,
     updatedAt: serverTimestamp(),
   }, { merge: true });
+};
+
+// Enquiries
+export const createEnquiry = async (data: Omit<Enquiry, 'id' | 'receivedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_enquiries'), {
+    ...data,
+    receivedAt: serverTimestamp(),
+  });
+};
+
+export const getEnquiries = async () => {
+  const q = query(collection(db, 'mgmt_enquiries'), orderBy('receivedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Enquiry[];
+};
+
+export const updateEnquiryStatus = async (enquiryId: string, status: 'converted' | 'ignored') => {
+  return await updateDoc(doc(db, 'mgmt_enquiries', enquiryId), { status });
 };
 
 // Projects
@@ -99,7 +118,6 @@ export const updateProjectStatus = async (projectId: string, newStatus: ProjectS
   
   const oldStatus = projectSnap.data().status as ProjectStatus;
   
-  // Anomaly Detection: Check for status jumps
   const oldIdx = STATUS_ORDER.indexOf(oldStatus);
   const newIdx = STATUS_ORDER.indexOf(newStatus);
   

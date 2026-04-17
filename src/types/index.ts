@@ -56,6 +56,19 @@ export interface Project {
   updatedAt: any;
 }
 
+export interface Enquiry {
+  id: string;
+  rawText: string;
+  parsedDetails?: {
+    customerName: string;
+    customerEmail: string;
+    customerPhone?: string;
+    projectSummary: string;
+  };
+  status: 'pending' | 'converted' | 'ignored';
+  receivedAt: any;
+}
+
 export interface SubTask {
   id: string;
   title: string;
@@ -139,7 +152,6 @@ export interface PaymentPlan {
   updatedAt: any;
 }
 
-// Module 7: Audit Types
 export type AuditEventType = 'auth_login' | 'auth_logout' | 'financial_override' | 'status_jump' | 'deletion' | 'settings_change';
 
 export interface AuditEntry {

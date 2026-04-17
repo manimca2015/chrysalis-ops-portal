@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState } from 'react';
@@ -20,16 +21,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Plus, Sparkles, Loader2 } from 'lucide-react';
-import { initiateProjectFromEmail } from '@/ai/flows/ai-email-project-initiation';
+import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createProject } from '@/services/mgmt-service';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 export function QuickAddProjectModal() {
   const [open, setOpen] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -64,32 +62,6 @@ export function QuickAddProjectModal() {
       category: 'custom-tour',
       summary: '',
     });
-    setEmailInput('');
-  };
-
-  const handleAiExtraction = async () => {
-    if (!emailInput.trim()) {
-      toast({ title: 'Validation', description: 'Please paste email content first.' });
-      return;
-    }
-
-    setIsAiProcessing(true);
-    try {
-      const result = await initiateProjectFromEmail({ emailContent: emailInput });
-      setFormData({
-        ...formData,
-        customerName: result.customerName,
-        customerEmail: result.customerEmail,
-        customerPhone: result.customerPhone || '',
-        summary: result.projectSummary,
-        title: `Project: ${result.customerName}`,
-      });
-      toast({ title: 'AI Extraction Complete', description: 'Form fields have been pre-filled.' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'AI Error', description: 'Failed to extract details from email.' });
-    } finally {
-      setIsAiProcessing(false);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -122,30 +94,6 @@ export function QuickAddProjectModal() {
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
-          <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-            <Label className="flex items-center gap-2 text-primary font-bold">
-              <Sparkles size={16} className="text-accent" />
-              AI Project Initiation
-            </Label>
-            <p className="text-xs text-muted-foreground">Paste inquiry email content below to auto-fill the form.</p>
-            <Textarea 
-              placeholder="Paste email content here..." 
-              className="mt-2 min-h-[100px] bg-background"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-            />
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="mt-2 w-full gap-2 border-accent text-accent hover:bg-accent hover:text-white"
-              onClick={handleAiExtraction}
-              disabled={isAiProcessing}
-            >
-              {isAiProcessing ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-              Process with AI
-            </Button>
-          </div>
-
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="title">Project Title</Label>

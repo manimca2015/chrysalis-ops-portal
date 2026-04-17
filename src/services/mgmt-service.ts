@@ -1,4 +1,5 @@
-import { db } from '@/lib/firebase';
+
+import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
   addDoc, 
@@ -9,10 +10,18 @@ import {
   doc, 
   updateDoc, 
   serverTimestamp,
-  getDoc,
-  onSnapshot
+  getDoc
 } from 'firebase/firestore';
-import { Project, Task, ProjectStatus } from '@/types';
+import { Project, Task, ProjectStatus, StaffProfile } from '@/types';
+
+const { db } = initializeFirebase();
+
+// Staff Management
+export const getStaffProfiles = async () => {
+  const q = query(collection(db, 'mgmt_staff'), orderBy('name', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StaffProfile[];
+};
 
 // Projects
 export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -27,6 +36,15 @@ export const getProjects = async () => {
   const q = query(collection(db, 'mgmt_projects'), orderBy('updatedAt', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
+};
+
+export const getProjectById = async (id: string) => {
+  const docRef = doc(db, 'mgmt_projects', id);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() } as Project;
+  }
+  return null;
 };
 
 export const updateProjectStatus = async (projectId: string, status: ProjectStatus) => {
@@ -56,10 +74,16 @@ export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedA
   });
 };
 
-// Read-only helpers for Chrysalis collections
-export const getChrysalisUser = async (email: string) => {
+// Read-only helpers for Chrysalis collections (Production Safety)
+export const getChrysalisUserByEmail = async (email: string) => {
   const q = query(collection(db, 'users'), where('email', '==', email));
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
   return snapshot.docs[0].data();
+};
+
+export const getChrysalisBooking = async (bookingId: string) => {
+  const docRef = doc(db, 'bookings', bookingId);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? docSnap.data() : null;
 };

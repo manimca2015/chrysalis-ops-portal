@@ -1,3 +1,4 @@
+
 export type MgmtRole = 'admin' | 'staff';
 
 export interface StaffProfile {
@@ -55,26 +56,4 @@ export interface Task {
   dueDate?: any;
   createdAt: any;
   updatedAt: any;
-}
-
-export interface CostingItem {
-  id: string;
-  costingSetId: string;
-  description: string;
-  supplierId: string;
-  costPrice: number;
-  markup: number;
-  sellingPrice: number;
-  currency: string;
-}
-
-export interface CostingSet {
-  id: string;
-  projectId: string;
-  name: string;
-  isBaseline: boolean;
-  totalCost: number;
-  totalSelling: number;
-  profitMargin: number;
-  createdAt: any;
 }

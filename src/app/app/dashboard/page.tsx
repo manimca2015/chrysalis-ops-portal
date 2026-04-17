@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,15 +8,19 @@ import {
   TrendingUp, 
   Clock, 
   AlertCircle, 
-  ChevronRight 
+  ChevronRight,
+  Database,
+  ShieldCheck
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { getProjects } from '@/services/mgmt-service';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardPage() {
-  const { data: projects, isLoading } = useQuery({
+  const { user, profile } = useAuth();
+  const { data: projects, isLoading, error } = useQuery({
     queryKey: ['projects'],
     queryFn: getProjects,
   });
@@ -29,10 +34,29 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-headline">Management Dashboard</h1>
-        <p className="text-muted-foreground">Overview of current operations and business performance.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">Management Dashboard</h1>
+          <p className="text-muted-foreground">Overview of current operations and business performance.</p>
+        </div>
+        <div className="flex gap-2">
+          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
+            <ShieldCheck size={14} className="text-accent" />
+            <span className="text-xs">Connected to Production</span>
+          </Badge>
+          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
+            <Database size={14} className="text-blue-500" />
+            <span className="text-xs">Isolated (mgmt_*)</span>
+          </Badge>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg flex items-center gap-3">
+          <AlertCircle size={20} />
+          <p className="text-sm font-medium">Connectivity Error: Failed to fetch from Firestore. Please check your credentials.</p>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
@@ -43,7 +67,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">+2 from last week</p>
+              <p className="text-xs text-muted-foreground mt-1">Live from mgmt_projects</p>
             </CardContent>
           </Card>
         ))}
@@ -57,7 +81,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="space-y-4">
               {isLoading ? (
-                <p>Loading projects...</p>
+                <p className="text-sm text-muted-foreground">Syncing data...</p>
               ) : projects?.slice(0, 5).map((project) => (
                 <div key={project.id} className="flex items-center justify-between group">
                   <div className="space-y-1">
@@ -70,7 +94,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-              {projects?.length === 0 && <p className="text-sm text-muted-foreground">No projects found.</p>}
+              {!isLoading && projects?.length === 0 && (
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground">No projects found in mgmt_projects.</p>
+                </div>
+              )}
             </div>
             <Button variant="link" className="mt-4 w-full p-0">View all projects</Button>
           </CardContent>
@@ -80,22 +108,24 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="text-orange-500" size={20} />
-              Actionable Insights
+              System Status
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="rounded-lg border-l-4 border-orange-500 bg-orange-50 p-4">
-                <p className="text-sm font-semibold text-orange-800">Delayed Quotations</p>
-                <p className="text-xs text-orange-700 mt-1">3 projects have been in 'costing' status for over 48 hours.</p>
+              <div className="p-3 rounded-md bg-muted/50 border flex items-center justify-between">
+                <span className="text-sm font-medium">Logged in as:</span>
+                <span className="text-sm text-primary font-bold">{profile?.name || user?.email}</span>
+              </div>
+              <div className="p-3 rounded-md bg-muted/50 border flex items-center justify-between">
+                <span className="text-sm font-medium">Assigned Role:</span>
+                <Badge className="capitalize">{profile?.role || 'staff'}</Badge>
               </div>
               <div className="rounded-lg border-l-4 border-accent bg-emerald-50 p-4">
-                <p className="text-sm font-semibold text-emerald-800">Approvals Needed</p>
-                <p className="text-xs text-emerald-700 mt-1">Senior Staff approval required for 1 low-margin quotation.</p>
-              </div>
-              <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
-                <p className="text-sm font-semibold text-blue-800">Task Deadlines</p>
-                <p className="text-xs text-blue-700 mt-1">5 tasks are due today across your assigned projects.</p>
+                <p className="text-sm font-semibold text-emerald-800">Operational Mode</p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  You are viewing Management data. Existing Chrysalis collections are protected (Read-Only).
+                </p>
               </div>
             </div>
           </CardContent>

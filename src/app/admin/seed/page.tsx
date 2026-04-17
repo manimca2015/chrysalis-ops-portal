@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -14,11 +13,13 @@ export default function SeedAdminPage() {
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
+  const targetUid = 'O9vpTjrJXyX8G1dcZ5SwBnfCQ2l1';
+
   const handleSeed = async () => {
     setLoading(true);
     try {
-      await upsertStaffProfile('oJELxGHYLxMkgFYrOUlF3vCf63c2', {
-        email: 'admin@chrysalistours.sg', // Replace with the actual email if known
+      await upsertStaffProfile(targetUid, {
+        email: 'admin@chrysalistours.sg',
         name: 'Chrysalis Admin',
         role: 'admin',
         avatarUrl: 'https://picsum.photos/seed/admin/200/200'
@@ -26,7 +27,7 @@ export default function SeedAdminPage() {
       setSuccess(true);
       toast({
         title: "Staff Profile Created",
-        description: "User oJELxGHYLxMkgFYrOUlF3vCf63c2 is now an Admin.",
+        description: `User ${targetUid} is now an Admin.`,
       });
     } catch (error: any) {
       toast({
@@ -53,7 +54,7 @@ export default function SeedAdminPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="p-3 bg-muted rounded-md font-mono text-xs break-all">
-            Target UID: oJELxGHYLxMkgFYrOUlF3vCf63c2
+            Target UID: {targetUid}
           </div>
           {success && (
             <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-3 rounded-md border border-emerald-200">

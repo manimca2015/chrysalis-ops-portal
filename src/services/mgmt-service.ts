@@ -26,14 +26,22 @@ import {
   ProjectAssignment,
   CostingSet,
   CostingItem,
-  Supplier,
   DocumentMetadata,
   PaymentPlan,
-  SubTask,
-  TaskComment
+  AuditEntry,
+  AuditEventType
 } from '@/types';
 
 const { db } = initializeFirebase();
+
+const STATUS_ORDER: ProjectStatus[] = [
+  'enquiry',
+  'costing',
+  'quotation_sent',
+  'confirmed',
+  'in_progress',
+  'completed'
+];
 
 // Staff Management
 export const getStaffProfiles = async () => {
@@ -83,18 +91,42 @@ export const getProjectById = async (id: string) => {
   return null;
 };
 
-export const updateProjectStatus = async (projectId: string, status: ProjectStatus, authorId: string, authorName: string) => {
+export const updateProjectStatus = async (projectId: string, newStatus: ProjectStatus, authorId: string, authorName: string) => {
   const projectRef = doc(db, 'mgmt_projects', projectId);
+  const projectSnap = await getDoc(projectRef);
+  
+  if (!projectSnap.exists()) throw new Error('Project not found');
+  
+  const oldStatus = projectSnap.data().status as ProjectStatus;
+  
+  // Anomaly Detection: Check for status jumps
+  const oldIdx = STATUS_ORDER.indexOf(oldStatus);
+  const newIdx = STATUS_ORDER.indexOf(newStatus);
+  
+  let isAnomaly = false;
+  if (newIdx > oldIdx + 1 && newStatus !== 'archived') {
+    isAnomaly = true;
+    await logAuditEvent({
+      event: 'status_jump',
+      severity: 'warning',
+      projectId,
+      userId: authorId,
+      userName: authorName,
+      details: `Project status jumped from ${oldStatus} directly to ${newStatus}.`,
+    });
+  }
+
   await updateDoc(projectRef, {
-    status,
+    status: newStatus,
     updatedAt: serverTimestamp(),
   });
 
   await addProjectActivity(projectId, {
-    type: 'status_change',
-    content: `Status updated to ${status.replace('_', ' ')}`,
+    type: isAnomaly ? 'anomaly' : 'status_change',
+    content: `Status updated to ${newStatus.replace('_', ' ')}`,
     authorId,
-    authorName
+    authorName,
+    isAnomaly
   });
 };
 
@@ -156,12 +188,6 @@ const recalculateCostingSet = async (setId: string) => {
 };
 
 // Documents & Payments
-export const getDocuments = async (projectId: string) => {
-  const q = query(collection(db, 'mgmt_documents'), where('projectId', '==', projectId), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DocumentMetadata[];
-};
-
 export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' | 'createdAt'>) => {
   return await addDoc(collection(db, 'mgmt_documents'), {
     ...docData,
@@ -178,7 +204,15 @@ export const getPaymentPlan = async (projectId: string) => {
   return null;
 };
 
-// Activity Log
+export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan, 'id' | 'updatedAt'>) => {
+  const docRef = doc(db, 'mgmt_payment_plans', projectId);
+  return await setDoc(docRef, {
+    ...plan,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Activity & Audit Logging
 export const addProjectActivity = async (projectId: string, activity: Omit<ProjectActivity, 'id' | 'timestamp'>) => {
   return await addDoc(collection(db, 'mgmt_projects', projectId, 'activity'), {
     ...activity,
@@ -190,6 +224,23 @@ export const getProjectActivity = async (projectId: string) => {
   const q = query(collection(db, 'mgmt_projects', projectId, 'activity'), orderBy('timestamp', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
+};
+
+export const logAuditEvent = async (event: Omit<AuditEntry, 'id' | 'timestamp'>) => {
+  return await addDoc(collection(db, 'mgmt_audit_log'), {
+    ...event,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const getAuditLogs = async (limitCount = 50) => {
+  const q = query(
+    collection(db, 'mgmt_audit_log'), 
+    orderBy('timestamp', 'desc'), 
+    limit(limitCount)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AuditEntry[];
 };
 
 // Task Management

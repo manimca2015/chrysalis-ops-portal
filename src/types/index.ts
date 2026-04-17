@@ -35,11 +35,12 @@ export interface ProjectAssignment {
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly';
   content: string;
   authorId: string;
   authorName: string;
   timestamp: any;
+  isAnomaly?: boolean;
 }
 
 export interface Project {
@@ -61,14 +62,6 @@ export interface SubTask {
   isCompleted: boolean;
 }
 
-export interface TaskComment {
-  id: string;
-  authorId: string;
-  authorName: string;
-  content: string;
-  timestamp: any;
-}
-
 export interface Task {
   id: string;
   projectId: string;
@@ -83,17 +76,6 @@ export interface Task {
   subTasks: SubTask[];
   createdAt: any;
   updatedAt: any;
-}
-
-// Module 3: Costing Types
-export interface Supplier {
-  id: string;
-  name: string;
-  category: string;
-  email?: string;
-  phone?: string;
-  baseCurrency: string;
-  notes?: string;
 }
 
 export interface CostingItem {
@@ -125,7 +107,6 @@ export interface CostingSet {
   updatedAt: any;
 }
 
-// Module 4: Documents & Payments
 export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt';
 
 export interface DocumentMetadata {
@@ -156,4 +137,19 @@ export interface PaymentPlan {
   currency: string;
   installments: Installment[];
   updatedAt: any;
+}
+
+// Module 7: Audit Types
+export type AuditEventType = 'auth_login' | 'auth_logout' | 'financial_override' | 'status_jump' | 'deletion' | 'settings_change';
+
+export interface AuditEntry {
+  id: string;
+  event: AuditEventType;
+  severity: 'info' | 'warning' | 'critical';
+  projectId?: string;
+  userId: string;
+  userName: string;
+  details: string;
+  metadata?: any;
+  timestamp: any;
 }

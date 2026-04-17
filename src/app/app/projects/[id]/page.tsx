@@ -3,8 +3,8 @@
 
 import React, { use } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProjectById, updateProjectStatus, getProjectActivity, getStaffProfiles, getProjectTasks } from '@/services/mgmt-service';
-import { ProjectStatus, ProjectAssignment } from '@/types';
+import { getProjectById, updateProjectStatus, getProjectActivity, getProjectTasks } from '@/services/mgmt-service';
+import { ProjectStatus } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,17 +22,15 @@ import {
   TabsTrigger 
 } from '@/components/ui/tabs';
 import { 
-  UserPlus, 
   CheckCircle2, 
   Clock, 
   Mail, 
-  Phone, 
-  Calendar,
   History,
   Info,
   Users as UsersIcon,
   ChevronRight,
-  ListTodo
+  ListTodo,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,6 +74,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['project-activity', id] });
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
       toast({ title: 'Status Updated', description: 'Project status has been changed successfully.' });
     }
   });
@@ -286,15 +285,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       <div className="p-8 text-center text-muted-foreground text-sm">No activity recorded.</div>
                     ) : (
                       activities?.map((item) => (
-                        <div key={item.id} className="p-4 px-6 flex gap-4">
+                        <div key={item.id} className={`p-4 px-6 flex gap-4 ${item.isAnomaly ? 'bg-orange-50/50' : ''}`}>
                           <div className="mt-1">
-                            {item.type === 'status_change' ? <Clock size={16} className="text-blue-500" /> : 
+                            {item.isAnomaly ? <AlertTriangle size={16} className="text-orange-500" /> : 
+                             item.type === 'status_change' ? <Clock size={16} className="text-blue-500" /> : 
                              item.type === 'assignment' ? <UsersIcon size={16} className="text-purple-500" /> : 
                              item.type === 'task_update' ? <ListTodo size={16} className="text-orange-500" /> :
                              <Info size={16} className="text-muted-foreground" />}
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm font-medium">{item.content}</p>
+                            <p className="text-sm font-medium">
+                              {item.content}
+                              {item.isAnomaly && <Badge className="ml-2 bg-orange-100 text-orange-700 hover:bg-orange-100 border-none h-4 text-[8px]">ANOMALY</Badge>}
+                            </p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span className="font-bold text-foreground/80">{item.authorName}</span>
                               <span>•</span>

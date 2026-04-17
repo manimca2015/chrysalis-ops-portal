@@ -29,7 +29,7 @@ export const upsertStaffProfile = async (uid: string, data: Partial<StaffProfile
   return await setDoc(staffRef, {
     ...data,
     updatedAt: serverTimestamp(),
-    createdAt: serverTimestamp(), // In a real app, you'd check if it exists first
+    createdAt: serverTimestamp(),
   }, { merge: true });
 };
 
@@ -85,6 +85,12 @@ export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedA
 };
 
 // Read-only helpers for Chrysalis collections (Production Safety)
+export const getChrysalisUserById = async (uid: string) => {
+  const docRef = doc(db, 'users', uid);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? docSnap.data() : null;
+};
+
 export const getChrysalisUserByEmail = async (email: string) => {
   const q = query(collection(db, 'users'), where('email', '==', email));
   const snapshot = await getDocs(q);

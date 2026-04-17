@@ -6,7 +6,7 @@ import {
   User, 
   signOut as firebaseSignOut 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { MgmtRole, StaffProfile } from '@/types';
 import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
 
@@ -35,6 +35,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function fetchProfile() {
       if (user) {
         try {
+          // Tier 1: Strict Production User Check
+          const prodUserRef = doc(db, 'users', user.uid);
+          const prodUserSnap = await getDoc(prodUserRef);
+
+          if (!prodUserSnap.exists()) {
+            setError("Access Restricted: No linked production user account found.");
+            setLoading(false);
+            return;
+          }
+
+          const prodUserData = prodUserSnap.data();
+          if (prodUserData.role !== 'Admin' || prodUserData.status !== 'Publish') {
+            setError("Access Denied: This portal is restricted to published Administrators.");
+            setLoading(false);
+            return;
+          }
+
+          // Tier 2: Fetch Management Portal Profile
           const profileDoc = await getDoc(doc(db, 'mgmt_staff', user.uid));
           
           if (profileDoc.exists()) {
@@ -43,15 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setRole(data.role || 'staff');
             setError(null);
           } else {
-            // Profile missing in mgmt_staff
-            console.warn("User authenticated but no staff profile found in mgmt_staff.");
+            console.warn("User authorized by Production but no staff profile found in mgmt_staff.");
             setProfile(null);
             setRole(null);
-            setError("Your account is not registered as a Portal Staff member. Please contact an Administrator.");
+            setError("Your production account is valid, but your Management Portal profile has not been initialized. Please contact the System Owner.");
           }
         } catch (err: any) {
-          console.error("Error fetching staff profile:", err);
-          setError("Failed to verify your staff access. Please check your connection.");
+          console.error("Error verifying access:", err);
+          setError("Verification failed. Please check your internet connection and try again.");
         }
       } else {
         setProfile(null);
@@ -62,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!authLoading) {
+      setLoading(true);
       fetchProfile();
     }
   }, [user, authLoading, db]);

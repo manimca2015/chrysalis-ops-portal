@@ -25,7 +25,9 @@ import {
   ProjectAssignment,
   CostingSet,
   CostingItem,
-  Supplier
+  Supplier,
+  DocumentMetadata,
+  PaymentPlan
 } from '@/types';
 
 const { db } = initializeFirebase();
@@ -169,6 +171,37 @@ export const getSuppliers = async () => {
   const q = query(collection(db, 'mgmt_suppliers'), orderBy('name', 'asc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
+};
+
+// Module 4: Document Services
+export const getDocuments = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_documents'), where('projectId', '==', projectId), orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DocumentMetadata[];
+};
+
+export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' | 'createdAt'>) => {
+  return await addDoc(collection(db, 'mgmt_documents'), {
+    ...docData,
+    createdAt: serverTimestamp(),
+  });
+};
+
+export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan, 'id' | 'updatedAt'>) => {
+  const planRef = doc(db, 'mgmt_payment_plans', projectId); // One plan per project for now
+  return await setDoc(planRef, {
+    ...plan,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getPaymentPlan = async (projectId: string) => {
+  const docRef = doc(db, 'mgmt_payment_plans', projectId);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    return { id: docSnap.id, ...docSnap.data() } as PaymentPlan;
+  }
+  return null;
 };
 
 // Activity Log

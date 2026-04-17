@@ -35,7 +35,7 @@ export interface ProjectAssignment {
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent';
   content: string;
   authorId: string;
   authorName: string;
@@ -105,5 +105,38 @@ export interface CostingSet {
   profitSgd: number;
   marginPercent: number;
   createdAt: any;
+  updatedAt: any;
+}
+
+// Module 4: Documents & Payments
+export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt';
+
+export interface DocumentMetadata {
+  id: string;
+  projectId: string;
+  type: DocumentType;
+  title: string;
+  fileUrl?: string;
+  status: 'draft' | 'sent' | 'signed' | 'paid';
+  recipientEmail: string;
+  version: number;
+  createdAt: any;
+  sentAt?: any;
+}
+
+export interface Installment {
+  label: string;
+  percentage: number;
+  amount: number;
+  dueDate?: any;
+  status: 'pending' | 'paid';
+}
+
+export interface PaymentPlan {
+  id: string;
+  projectId: string;
+  totalAmount: number;
+  currency: string;
+  installments: Installment[];
   updatedAt: any;
 }

@@ -14,7 +14,8 @@ import {
   setDoc,
   arrayUnion,
   deleteDoc,
-  Timestamp
+  Timestamp,
+  limit
 } from 'firebase/firestore';
 import { 
   Project, 
@@ -97,21 +98,6 @@ export const updateProjectStatus = async (projectId: string, status: ProjectStat
   });
 };
 
-export const assignStaffToProject = async (projectId: string, assignment: ProjectAssignment, authorId: string, authorName: string) => {
-  const projectRef = doc(db, 'mgmt_projects', projectId);
-  await updateDoc(projectRef, {
-    teamAssignments: arrayUnion(assignment),
-    updatedAt: serverTimestamp(),
-  });
-
-  await addProjectActivity(projectId, {
-    type: 'assignment',
-    content: `Assigned ${assignment.staffName} as ${assignment.role}`,
-    authorId,
-    authorName
-  });
-};
-
 // Costing Engine
 export const getCostingSets = async (projectId: string) => {
   const q = query(collection(db, 'mgmt_costing_sets'), where('projectId', '==', projectId), orderBy('createdAt', 'asc'));
@@ -169,13 +155,7 @@ const recalculateCostingSet = async (setId: string) => {
   });
 };
 
-export const getSuppliers = async () => {
-  const q = query(collection(db, 'mgmt_suppliers'), orderBy('name', 'asc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
-};
-
-// Module 4: Document Services
+// Documents & Payments
 export const getDocuments = async (projectId: string) => {
   const q = query(collection(db, 'mgmt_documents'), where('projectId', '==', projectId), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
@@ -186,14 +166,6 @@ export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' |
   return await addDoc(collection(db, 'mgmt_documents'), {
     ...docData,
     createdAt: serverTimestamp(),
-  });
-};
-
-export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan, 'id' | 'updatedAt'>) => {
-  const planRef = doc(db, 'mgmt_payment_plans', projectId); 
-  return await setDoc(planRef, {
-    ...plan,
-    updatedAt: serverTimestamp(),
   });
 };
 
@@ -220,11 +192,22 @@ export const getProjectActivity = async (projectId: string) => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
 };
 
-// Module 5: Task Management
+// Task Management
 export const getProjectTasks = async (projectId: string) => {
   const q = query(
     collection(db, 'mgmt_tasks'), 
     where('projectId', '==', projectId),
+    orderBy('dueDate', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+};
+
+export const getUserTasks = async (userId: string) => {
+  const q = query(
+    collection(db, 'mgmt_tasks'),
+    where('assignedToId', '==', userId),
+    where('status', 'in', ['pending', 'ready_for_verification']),
     orderBy('dueDate', 'asc')
   );
   const snapshot = await getDocs(q);
@@ -246,7 +229,6 @@ export const updateTask = async (taskId: string, data: Partial<Task>, authorId: 
     updatedAt: serverTimestamp(),
   });
 
-  // Log to project activity if status changed
   if (data.status) {
     const taskSnap = await getDoc(taskRef);
     const projectId = taskSnap.data()?.projectId;
@@ -261,15 +243,13 @@ export const updateTask = async (taskId: string, data: Partial<Task>, authorId: 
   }
 };
 
-export const addTaskComment = async (taskId: string, comment: Omit<TaskComment, 'id' | 'timestamp'>) => {
-  return await addDoc(collection(db, 'mgmt_tasks', taskId, 'comments'), {
-    ...comment,
-    timestamp: serverTimestamp(),
-  });
-};
-
-export const getTaskComments = async (taskId: string) => {
-  const q = query(collection(db, 'mgmt_tasks', taskId, 'comments'), orderBy('timestamp', 'asc'));
+// Analytics & Insights
+export const getLowMarginSets = async () => {
+  const q = query(
+    collection(db, 'mgmt_costing_sets'),
+    where('marginPercent', '<', 15),
+    limit(10)
+  );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TaskComment[];
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
 };

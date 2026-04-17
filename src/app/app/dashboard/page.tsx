@@ -1,7 +1,7 @@
 
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   FolderKanban, 
   Users, 
@@ -10,124 +10,150 @@ import {
   AlertCircle, 
   ChevronRight,
   Database,
-  ShieldCheck
+  ShieldCheck,
+  Zap,
+  ArrowUpRight,
+  DollarSign
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
-import { getProjects } from '@/services/mgmt-service';
+import { getProjects, getLowMarginSets } from '@/services/mgmt-service';
 import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
-  const { data: projects, isLoading, error } = useQuery({
+  
+  const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: getProjects,
   });
 
+  const { data: lowMarginSets } = useQuery({
+    queryKey: ['low-margin-insights'],
+    queryFn: getLowMarginSets,
+  });
+
+  const activeProjects = projects?.filter(p => p.status !== 'completed' && p.status !== 'archived') || [];
+  const enquiries = projects?.filter(p => p.status === 'enquiry') || [];
+  
   const stats = [
-    { name: 'Active Projects', value: projects?.length || 0, icon: FolderKanban, color: 'text-blue-500' },
-    { name: 'New Enquiries', value: projects?.filter(p => p.status === 'enquiry').length || 0, icon: Clock, color: 'text-orange-500' },
-    { name: 'Total Revenue (Est)', value: '$124,500', icon: TrendingUp, color: 'text-accent' },
-    { name: 'Team Capacity', value: '84%', icon: Users, color: 'text-purple-500' },
+    { name: 'Active Projects', value: activeProjects.length, icon: FolderKanban, color: 'text-blue-500', trend: '+12%' },
+    { name: 'New Enquiries', value: enquiries.length, icon: Clock, color: 'text-orange-500', trend: '+5%' },
+    { name: 'Total Revenue (Est)', value: '$124.5k', icon: DollarSign, color: 'text-emerald-500', trend: '+18%' },
+    { name: 'Avg Margin', value: '22.4%', icon: TrendingUp, color: 'text-accent', trend: '-2%' },
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 pb-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">Management Dashboard</h1>
-          <p className="text-muted-foreground">Overview of current operations and business performance.</p>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">Operations Hub</h1>
+          <p className="text-muted-foreground">Welcome back, {profile?.name || 'Staff'}. Here's what needs attention today.</p>
         </div>
-        <div className="flex gap-2">
-          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
-            <ShieldCheck size={14} className="text-accent" />
-            <span className="text-xs">Connected to Production</span>
-          </Badge>
-          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
-            <Database size={14} className="text-blue-500" />
-            <span className="text-xs">Isolated (mgmt_*)</span>
-          </Badge>
+        <div className="flex items-center gap-3">
+           <Button variant="outline" className="gap-2" asChild>
+              <Link href="/app/projects">
+                <FolderKanban size={16} /> All Projects
+              </Link>
+           </Button>
+           <Button className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90" asChild>
+              <Link href="/app/projects?action=new">
+                <Zap size={16} /> New Project
+              </Link>
+           </Button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg flex items-center gap-3">
-          <AlertCircle size={20} />
-          <p className="text-sm font-medium">Connectivity Error: Failed to fetch from Firestore. Please check your credentials.</p>
-        </div>
-      )}
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.name} className="shadow-sm">
+          <Card key={stat.name} className="shadow-sm border-none bg-white">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium">{stat.name}</CardTitle>
-              <stat.icon className={stat.color} size={18} />
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{stat.name}</CardTitle>
+              <div className={`p-2 rounded-lg bg-muted/50 ${stat.color}`}>
+                <stat.icon size={16} />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">Live from mgmt_projects</p>
+              <div className="flex items-end justify-between">
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <div className={`text-xs font-bold flex items-center gap-0.5 ${stat.trend.startsWith('+') ? 'text-emerald-500' : 'text-destructive'}`}>
+                  {stat.trend} <ArrowUpRight size={10} className={stat.trend.startsWith('+') ? '' : 'rotate-90'} />
+                </div>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-1 shadow-sm">
-          <CardHeader>
-            <CardTitle>Recent Projects</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {isLoading ? (
-                <p className="text-sm text-muted-foreground">Syncing data...</p>
-              ) : projects?.slice(0, 5).map((project) => (
-                <div key={project.id} className="flex items-center justify-between group">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{project.title}</p>
-                    <p className="text-xs text-muted-foreground">{project.customerDetails.name}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="capitalize">{project.status.replace('_', ' ')}</Badge>
-                    <ChevronRight size={16} className="text-muted-foreground group-hover:text-primary transition-colors cursor-pointer" />
-                  </div>
-                </div>
-              ))}
-              {!isLoading && projects?.length === 0 && (
-                <div className="text-center py-6">
-                  <p className="text-sm text-muted-foreground">No projects found in mgmt_projects.</p>
-                </div>
-              )}
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Actionable Insights Panel */}
+        <Card className="md:col-span-2 shadow-md border-none">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="text-accent" size={20} /> Actionable Insights
+              </CardTitle>
+              <CardDescription>Auto-flagged items requiring management review.</CardDescription>
             </div>
-            <Button variant="link" className="mt-4 w-full p-0">View all projects</Button>
+            <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20">
+              {lowMarginSets?.length || 0} Alerts
+            </Badge>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {lowMarginSets && lowMarginSets.length > 0 ? (
+              lowMarginSets.map(set => (
+                <div key={set.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-transparent hover:border-accent/30 transition-all group">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 p-1.5 bg-destructive/10 text-destructive rounded-full">
+                      <AlertCircle size={14} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">Low Margin Warning: {set.name}</p>
+                      <p className="text-xs text-muted-foreground">Margin is at {set.marginPercent.toFixed(1)}% (Threshold: 15%)</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                    <Link href={`/app/projects/${set.projectId}/costing`}>
+                      Review <ChevronRight size={14} />
+                    </Link>
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Zap size={32} className="text-muted-foreground mb-2 opacity-20" />
+                <p className="text-sm text-muted-foreground">All systems operational. No critical insights at this time.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 shadow-sm">
+        {/* Quick Recent Activity / Recent Projects */}
+        <Card className="shadow-sm border-none bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="text-orange-500" size={20} />
-              System Status
-            </CardTitle>
+            <CardTitle className="text-lg">Recent Projects</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="p-3 rounded-md bg-muted/50 border flex items-center justify-between">
-                <span className="text-sm font-medium">Logged in as:</span>
-                <span className="text-sm text-primary font-bold">{profile?.name || user?.email}</span>
+          <CardContent className="space-y-4">
+            {projectsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <div key={i} className="h-12 bg-muted animate-pulse rounded" />)}
               </div>
-              <div className="p-3 rounded-md bg-muted/50 border flex items-center justify-between">
-                <span className="text-sm font-medium">Assigned Role:</span>
-                <Badge className="capitalize">{profile?.role || 'staff'}</Badge>
+            ) : projects?.slice(0, 5).map(project => (
+              <div key={project.id} className="flex items-center justify-between group">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-bold leading-none">{project.title}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{project.status.replace('_', ' ')}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <Link href={`/app/projects/${project.id}`}><ChevronRight size={16} /></Link>
+                </Button>
               </div>
-              <div className="rounded-lg border-l-4 border-accent bg-emerald-50 p-4">
-                <p className="text-sm font-semibold text-emerald-800">Operational Mode</p>
-                <p className="text-xs text-emerald-700 mt-1">
-                  You are viewing Management data. Existing Chrysalis collections are protected (Read-Only).
-                </p>
-              </div>
-            </div>
+            ))}
+            <Button variant="link" className="w-full text-xs text-primary" asChild>
+              <Link href="/app/projects">View All Projects</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

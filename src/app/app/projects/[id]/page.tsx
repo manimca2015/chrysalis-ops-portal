@@ -118,10 +118,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       type,
       projectTitle: project!.title,
       category: project!.category,
-      notes: project!.notes
+      notes: project!.notes || 'No notes provided.'
     }),
+    onMutate: () => {
+      toast({ title: 'AI Assistant', description: 'Generating intelligence report...' });
+    },
     onSuccess: (data) => {
       setAiInsight(data);
+      toast({ title: 'Report Ready', description: 'Check the overview tab for your AI insights.' });
     },
     onError: (err: any) => {
       toast({ variant: 'destructive', title: 'AI Error', description: err.message });
@@ -245,13 +249,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       <div>
                         <p className="text-[10px] font-bold uppercase text-accent-foreground mb-1">Key Takeaways</p>
                         <ul className="text-[10px] space-y-1 list-disc pl-4 text-muted-foreground">
-                          {aiInsight.keyTakeaways.map((k, i) => <li key={i}>{k}</li>)}
+                          {aiInsight.keyTakeaways.map((k, i) => <li key={i} className="line-clamp-2">{k}</li>)}
                         </ul>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold uppercase text-accent-foreground mb-1">Suggested Actions</p>
                         <ul className="text-[10px] space-y-1 list-disc pl-4 text-muted-foreground">
-                          {aiInsight.suggestedActions.map((s, i) => <li key={i}>{s}</li>)}
+                          {aiInsight.suggestedActions.map((s, i) => <li key={i} className="line-clamp-2">{s}</li>)}
                         </ul>
                       </div>
                     </div>
@@ -309,28 +313,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </Card>
               </div>
 
-              {project.notes && (
-                <Card className="shadow-sm">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm">Enquiry Notes</CardTitle>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-7 gap-2 text-accent"
-                      onClick={() => aiInsightMutation.mutate('summary')}
-                      disabled={aiInsightMutation.isPending}
-                    >
-                      {aiInsightMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Sparkles size={12} />}
-                      Summarize AI
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                      {project.notes}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <Card className="shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm">Enquiry Notes</CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 gap-2 text-accent"
+                    onClick={() => aiInsightMutation.mutate('summary')}
+                    disabled={aiInsightMutation.isPending}
+                  >
+                    {aiInsightMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Sparkles size={12} />}
+                    Summarize AI
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    {project.notes || 'No project notes available.'}
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="documents">

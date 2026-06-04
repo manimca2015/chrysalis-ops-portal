@@ -45,7 +45,7 @@ export async function generateProjectInsights(input: ProjectIntelligenceInput): 
 
 const prompt = ai.definePrompt({
   name: 'projectIntelligencePrompt',
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: ProjectIntelligenceInternalInputSchema},
   output: {schema: ProjectIntelligenceOutputSchema},
   prompt: `You are an expert travel operations consultant for "Chrysalis Tours Singapore".
@@ -55,7 +55,7 @@ const prompt = ai.definePrompt({
   {{#if isItinerary}}
   GENERATE A DRAFT ITINERARY:
   Based on these notes: "{{{notes}}}"
-  - Create a structured 3-day or multi-day itinerary.
+  - Create a structured multi-day itinerary.
   - Suggest specific Singaporean landmarks and unique local experiences.
   - Keep the tone professional but exciting.
   {{/if}}
@@ -65,10 +65,6 @@ const prompt = ai.definePrompt({
   Total Cost: SGD {{{costingData.totalCost}}}
   Total Selling: SGD {{{costingData.totalSelling}}}
   Margin: {{{costingData.margin}}}%
-  Line Items:
-  {{#each costingData.items}}
-  - {{{description}}} (Supplier: {{{supplier}}}, Cost: SGD {{{cost}}})
-  {{/each}}
   
   - Evaluate if the margin is healthy (target is 15-25%).
   - Suggest areas where costs might be high or markup could be increased.
@@ -78,9 +74,9 @@ const prompt = ai.definePrompt({
   {{#if isSummary}}
   PROJECT CATCH-UP SUMMARY:
   Notes: "{{{notes}}}"
-  Status: Currently in planning phase.
-  - Summarize the customer's core needs.
-  - Highlight the most critical "must-haves" based on the enquiry.
+  - Summarize the customer's core needs from the enquiry.
+  - Highlight the most critical "must-haves" based on the enquiry text.
+  - If notes are empty, suggest initial discovery questions for the {{{category}}} category.
   {{/if}}
 
   Format the 'content' field with clear Markdown headings.`,

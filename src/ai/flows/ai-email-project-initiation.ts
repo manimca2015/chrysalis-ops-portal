@@ -9,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {gemini15Flash} from '@genkit-ai/google-genai';
 
 const EmailProjectInitiationInputSchema = z.object({
   emailContent: z.string().describe('The full content of the inquiry email.'),
@@ -30,8 +29,7 @@ export async function initiateProjectFromEmail(input: EmailProjectInitiationInpu
 
 const prompt = ai.definePrompt({
   name: 'emailProjectInitiationPrompt',
-  // Using explicit model reference to avoid 404 name mismatches
-  model: gemini15Flash,
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: EmailProjectInitiationInputSchema},
   output: {schema: EmailProjectInitiationOutputSchema},
   prompt: `You are an AI assistant specialized in extracting key information from customer inquiry emails to facilitate project initiation for a tour company.
@@ -71,7 +69,7 @@ const emailProjectInitiationFlow = ai.defineFlow(
       }
       
       if (error.message?.includes('404')) {
-        throw new Error('AI Model not found. This might be a regional restriction or API configuration issue.');
+        throw new Error('AI Model not found (404). This might be a regional restriction or API configuration issue with the model identifier.');
       }
 
       throw new Error(error.message || 'The AI could not process this email.');

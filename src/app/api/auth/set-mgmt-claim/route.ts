@@ -1,4 +1,3 @@
-
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -21,7 +20,8 @@ export async function POST(request: Request) {
     const userDoc = await db.collection('users').doc(uid).get();
     
     if (!userDoc.exists) {
-      return NextResponse.json({ error: 'User record not found' }, { status: 403 });
+      console.warn(`Auth Error: User record not found for UID ${uid}`);
+      return NextResponse.json({ error: 'User record not found in system database. Please initialize portal.' }, { status: 403 });
     }
 
     const userData = userDoc.data();
@@ -41,15 +41,17 @@ export async function POST(request: Request) {
         maxAge: expiresIn,
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
         path: '/',
       });
 
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: 'Access denied. Admin accounts only.' }, { status: 403 });
+    console.warn(`Auth Error: Access denied for UID ${uid}. Role: ${userData?.role}, Status: ${userData?.status}`);
+    return NextResponse.json({ error: 'Access denied. Only published Admin accounts can enter.' }, { status: 403 });
   } catch (error: any) {
     console.error('Error setting custom claim:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

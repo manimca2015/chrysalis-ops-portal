@@ -10,10 +10,12 @@ export interface PDFData {
   items: CostingItem[];
   installments: Installment[];
   documentTitle: string;
+  introduction?: string;
+  terms?: string;
 }
 
 export const generateQuotationPDF = (data: PDFData) => {
-  const { project, costingSet, items, installments, documentTitle } = data;
+  const { project, costingSet, items, installments, documentTitle, introduction, terms } = data;
   const doc = new jsPDF();
 
   // Header
@@ -44,22 +46,29 @@ export const generateQuotationPDF = (data: PDFData) => {
   doc.text(project.customerDetails.email, 15, 77);
   if (project.customerDetails.phone) doc.text(project.customerDetails.phone, 15, 82);
 
-  // Project Description
-  doc.setFontSize(12);
-  doc.text('TOUR SUMMARY', 15, 95);
-  doc.setFontSize(10);
-  doc.setTextColor(80);
-  const splitTitle = doc.splitTextToSize(project.title, 180);
-  doc.text(splitTitle, 15, 102);
+  let currentY = 100;
+
+  // Introduction
+  if (introduction) {
+    doc.setFontSize(12);
+    doc.setTextColor(45, 90, 105);
+    doc.text('INTRODUCTION', 15, currentY);
+    currentY += 7;
+    doc.setFontSize(10);
+    doc.setTextColor(80);
+    const splitIntro = doc.splitTextToSize(introduction, 180);
+    doc.text(splitIntro, 15, currentY);
+    currentY += (splitIntro.length * 5) + 10;
+  }
 
   // Line Items Table
   autoTable(doc, {
-    startY: 115,
+    startY: currentY,
     head: [['Description', 'Qty', 'Unit Price (SGD)', 'Total (SGD)']],
     body: items.map(item => [
       item.description,
       item.quantity,
-      item.sellingPriceSgd / item.quantity,
+      (item.sellingPriceSgd / item.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 }),
       item.sellingPriceSgd.toLocaleString(undefined, { minimumFractionDigits: 2 })
     ]),
     theme: 'grid',
@@ -67,41 +76,69 @@ export const generateQuotationPDF = (data: PDFData) => {
     styles: { fontSize: 9 }
   });
 
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+
   // Totals
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
   doc.setFontSize(12);
   doc.setTextColor(0);
-  doc.text(`TOTAL AGREED PRICE:`, 110, finalY);
+  doc.text(`TOTAL AGREED PRICE:`, 110, currentY);
   doc.setFontSize(14);
   doc.setTextColor(97, 204, 179); // --accent color
-  doc.text(`SGD ${costingSet.totalSellingSgd.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 155, finalY);
+  doc.text(`SGD ${costingSet.totalSellingSgd.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 155, currentY);
+
+  currentY += 15;
 
   // Payment Schedule
   if (installments.length > 0) {
+    // Check for page overflow
+    if (currentY > 230) {
+      doc.addPage();
+      currentY = 20;
+    }
+
     doc.setFontSize(12);
     doc.setTextColor(45, 90, 105);
-    doc.text('PAYMENT SCHEDULE', 15, finalY + 15);
+    doc.text('PAYMENT SCHEDULE', 15, currentY);
     
     autoTable(doc, {
-      startY: finalY + 20,
-      head: [['Milestone', '%', 'Amount (SGD)', 'Due Date']],
+      startY: currentY + 5,
+      head: [['Milestone', '%', 'Amount (SGD)']],
       body: installments.map(i => [
         i.label,
         `${i.percentage}%`,
-        i.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
-        i.dueDate ? format(new Date(i.dueDate.toDate ? i.dueDate.toDate() : i.dueDate), 'dd MMM yyyy') : 'TBD'
+        i.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
       ]),
       theme: 'plain',
       styles: { fontSize: 8 }
     });
+    
+    currentY = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // Footer / Terms
-  const pageHeight = doc.internal.pageSize.height;
-  doc.setFontSize(8);
-  doc.setTextColor(150);
-  doc.text('Thank you for choosing Chrysalis Tours. This quotation is valid for 14 days.', 15, pageHeight - 20);
-  doc.text('Subject to availability at time of booking.', 15, pageHeight - 15);
+  // Terms & Conditions
+  if (terms) {
+    if (currentY > 230) {
+      doc.addPage();
+      currentY = 20;
+    }
+    doc.setFontSize(12);
+    doc.setTextColor(45, 90, 105);
+    doc.text('TERMS & CONDITIONS', 15, currentY);
+    currentY += 7;
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    const splitTerms = doc.splitTextToSize(terms, 180);
+    doc.text(splitTerms, 15, currentY);
+  }
+
+  // Footer
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`Page ${i} of ${pageCount} | Chrysalis Tours Singapore`, 15, 285);
+  }
 
   return doc;
 };

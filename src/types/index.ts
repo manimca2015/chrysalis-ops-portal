@@ -229,7 +229,8 @@ export type AuditEventType =
   | 'settings_change' 
   | 'clone_project'
   | 'bill_created'
-  | 'supplier_payment';
+  | 'supplier_payment'
+  | 'document_generated';
 
 export interface AuditEntry {
   id: string;

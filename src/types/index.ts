@@ -30,12 +30,12 @@ export interface CustomerDetails {
 export interface ProjectAssignment {
   staffId: string;
   staffName: string;
-  role: 'Senior Staff' | 'Team Lead' | 'Assisting Member';
+  role: 'Team Lead' | 'Assisting Member' | 'Senior Staff';
 }
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly' | 'questionnaire_sent';
   content: string;
   authorId: string;
   authorName: string;
@@ -56,6 +56,26 @@ export interface Project {
   updatedAt: any;
 }
 
+export interface QuestionnaireTemplate {
+  id: string;
+  category: string;
+  title: string;
+  questions: string[];
+  updatedAt: any;
+}
+
+export interface TaskTemplate {
+  id: string;
+  category: string;
+  title: string;
+  tasks: {
+    title: string;
+    priority: 'low' | 'medium' | 'high';
+    role: string;
+  }[];
+  updatedAt: any;
+}
+
 export interface Enquiry {
   id: string;
   rawText: string;
@@ -65,7 +85,7 @@ export interface Enquiry {
     customerPhone?: string;
     projectSummary: string;
   };
-  status: 'pending' | 'converted' | 'ignored';
+  status: 'pending' | 'converted' | 'ignored' | 'spam';
   receivedAt: any;
 }
 
@@ -120,7 +140,7 @@ export interface CostingSet {
   updatedAt: any;
 }
 
-export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt';
+export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt' | 'client_file';
 
 export interface DocumentMetadata {
   id: string;
@@ -128,7 +148,7 @@ export interface DocumentMetadata {
   type: DocumentType;
   title: string;
   fileUrl?: string;
-  status: 'draft' | 'sent' | 'signed' | 'paid';
+  status: 'draft' | 'sent' | 'signed' | 'paid' | 'uploaded';
   recipientEmail: string;
   version: number;
   createdAt: any;
@@ -152,7 +172,7 @@ export interface PaymentPlan {
   updatedAt: any;
 }
 
-export type AuditEventType = 'auth_login' | 'auth_logout' | 'financial_override' | 'status_jump' | 'deletion' | 'settings_change';
+export type AuditEventType = 'auth_login' | 'auth_logout' | 'financial_override' | 'status_jump' | 'deletion' | 'settings_change' | 'clone_project';
 
 export interface AuditEntry {
   id: string;

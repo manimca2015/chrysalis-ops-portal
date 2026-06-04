@@ -1,9 +1,16 @@
 
 "use client"
 
-import React, { use } from 'react';
+import React, { use, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getProjectById, updateProjectStatus, getProjectActivity, getProjectTasks } from '@/services/mgmt-service';
+import { 
+  getProjectById, 
+  updateProjectStatus, 
+  getProjectActivity, 
+  getProjectTasks,
+  cloneProject,
+  getDocuments
+} from '@/services/mgmt-service';
 import { ProjectStatus } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,13 +37,20 @@ import {
   Users as UsersIcon,
   ChevronRight,
   ListTodo,
-  AlertTriangle
+  AlertTriangle,
+  Copy,
+  FileText,
+  MessageSquarePlus,
+  Download,
+  FileIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { QuestionnaireModal } from '@/components/projects/questionnaire-modal';
 
 const STATUS_STEPS: ProjectStatus[] = [
   'enquiry',
@@ -51,6 +65,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -68,14 +83,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     queryFn: () => getProjectTasks(id),
   });
 
+  const { data: documents } = useQuery({
+    queryKey: ['documents', id],
+    queryFn: () => getDocuments(id),
+  });
+
   const statusMutation = useMutation({
     mutationFn: (status: ProjectStatus) => 
       updateProjectStatus(id, status, user?.uid || 'unknown', user?.email || 'System'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['project-activity', id] });
-      queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
-      toast({ title: 'Status Updated', description: 'Project status has been changed successfully.' });
+      toast({ title: 'Status Updated' });
+    }
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: () => cloneProject(id, user?.uid || 'system', user?.email || 'System'),
+    onSuccess: (newId) => {
+      toast({ title: 'Project Cloned', description: 'Redirecting to the new project...' });
+      router.push(`/app/projects/${newId}`);
     }
   });
 
@@ -91,9 +118,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  if (!project) {
-    return <div className="p-8 text-center">Project not found.</div>;
-  }
+  if (!project) return <div className="p-8 text-center">Project not found.</div>;
 
   const currentStatusIndex = STATUS_STEPS.indexOf(project.status);
   const taskProgress = tasks ? (tasks.filter(t => t.status === 'completed').length / (tasks.length || 1)) * 100 : 0;
@@ -112,6 +137,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <h1 className="text-3xl font-bold tracking-tight font-headline">{project.title}</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => cloneMutation.mutate()} disabled={cloneMutation.isPending}>
+            <Copy size={14} /> Clone Project
+          </Button>
           <Select 
             value={project.status} 
             onValueChange={(val) => statusMutation.mutate(val as ProjectStatus)}
@@ -127,9 +155,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <SelectItem value="archived">ARCHIVED</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="default" className="gap-2">
-            <Mail size={16} /> Send Email
-          </Button>
         </div>
       </div>
 
@@ -171,6 +196,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="bg-muted/50 p-1">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="documents">Documents</TabsTrigger>
               <TabsTrigger value="team">Team Assignments</TabsTrigger>
               <TabsTrigger value="activity">Activity Log</TabsTrigger>
             </TabsList>
@@ -235,13 +261,50 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               )}
             </TabsContent>
 
+            <TabsContent value="documents">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Project Document Hub</CardTitle>
+                  <CardDescription>Central repository for contracts, invoices, and client files.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y">
+                    {!documents || documents.length === 0 ? (
+                      <div className="p-12 text-center text-muted-foreground text-sm flex flex-col items-center">
+                        <FileText size={40} className="mb-2 opacity-20" />
+                        No documents recorded for this project.
+                      </div>
+                    ) : (
+                      documents.map((doc) => (
+                        <div key={doc.id} className="flex items-center justify-between p-4 px-6 hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/5 text-primary rounded">
+                              <FileIcon size={18} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold">{doc.title}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{doc.type.replace('_', ' ')} • {format(doc.createdAt.toDate(), 'dd MMM yyyy')}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[9px] font-bold h-5">{doc.status}</Badge>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                               <Download size={16} className="text-primary" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             <TabsContent value="team">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">Project Team</CardTitle>
-                    <CardDescription>Assign roles for this specific project.</CardDescription>
-                  </div>
+                <CardHeader>
+                  <CardTitle className="text-lg">Project Team</CardTitle>
+                  <CardDescription>Assign roles for this specific project.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y">
@@ -291,6 +354,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                              item.type === 'status_change' ? <Clock size={16} className="text-blue-500" /> : 
                              item.type === 'assignment' ? <UsersIcon size={16} className="text-purple-500" /> : 
                              item.type === 'task_update' ? <ListTodo size={16} className="text-orange-500" /> :
+                             item.type === 'questionnaire_sent' ? <MessageSquarePlus size={16} className="text-accent" /> :
                              <Info size={16} className="text-muted-foreground" />}
                           </div>
                           <div className="space-y-1">
@@ -319,9 +383,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <div className="h-2 bg-accent" />
             <CardHeader>
               <CardTitle className="text-lg">Command Center</CardTitle>
-              <CardDescription>Actions for {project.status.replace('_', ' ')}</CardDescription>
+              <CardDescription>Lifecycle Actions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <QuestionnaireModal project={project} />
+              
               <Button variant="outline" className="w-full justify-between group" asChild>
                 <Link href={`/app/projects/${id}/costing`}>
                   Costing Engine <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />

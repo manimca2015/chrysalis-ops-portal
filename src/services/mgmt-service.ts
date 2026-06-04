@@ -1,3 +1,4 @@
+
 import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
@@ -28,8 +29,9 @@ import {
   DocumentMetadata,
   PaymentPlan,
   AuditEntry,
-  AuditEventType,
-  Enquiry
+  Enquiry,
+  QuestionnaireTemplate,
+  TaskTemplate
 } from '@/types';
 
 const { db } = initializeFirebase();
@@ -72,36 +74,72 @@ export const getEnquiries = async () => {
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Enquiry[];
 };
 
-export const updateEnquiryStatus = async (enquiryId: string, status: 'converted' | 'ignored') => {
+export const updateEnquiryStatus = async (enquiryId: string, status: Enquiry['status']) => {
   return await updateDoc(doc(db, 'mgmt_enquiries', enquiryId), { status });
+};
+
+// Templates
+export const getQuestionnaireTemplates = async () => {
+  const q = query(collection(db, 'mgmt_questionnaire_templates'), orderBy('category', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as QuestionnaireTemplate[];
+};
+
+export const saveQuestionnaireTemplate = async (data: Omit<QuestionnaireTemplate, 'id' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_questionnaire_templates'), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const getTaskTemplates = async () => {
+  const q = query(collection(db, 'mgmt_task_templates'), orderBy('category', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TaskTemplate[];
 };
 
 // Projects
 export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
-  try {
-    const docRef = await addDoc(collection(db, 'mgmt_projects'), {
-      ...data,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    
-    // Attempt to log initial activity
-    try {
-      await addProjectActivity(docRef.id, {
-        type: 'system',
-        content: `Project created with status: ${data.status}`,
-        authorId: 'system',
-        authorName: 'System'
-      });
-    } catch (activityError) {
-      console.warn('Project created but failed to log initial activity:', activityError);
-    }
+  const docRef = await addDoc(collection(db, 'mgmt_projects'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  
+  await addProjectActivity(docRef.id, {
+    type: 'system',
+    content: `Project initiated: ${data.title}`,
+    authorId: 'system',
+    authorName: 'System'
+  });
 
-    return docRef;
-  } catch (error) {
-    console.error('Error in createProject service:', error);
-    throw error;
-  }
+  return docRef;
+};
+
+export const cloneProject = async (projectId: string, authorId: string, authorName: string) => {
+  const original = await getProjectById(projectId);
+  if (!original) throw new Error('Project not found');
+
+  const { id, createdAt, updatedAt, ...clonedData } = original;
+  
+  const docRef = await addDoc(collection(db, 'mgmt_projects'), {
+    ...clonedData,
+    title: `CLONE: ${clonedData.title}`,
+    status: 'enquiry',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  await logAuditEvent({
+    event: 'clone_project',
+    severity: 'info',
+    projectId: docRef.id,
+    userId: authorId,
+    userName: authorName,
+    details: `Project cloned from ${projectId}`,
+  });
+
+  return docRef.id;
 };
 
 export const getProjects = async () => {
@@ -126,7 +164,6 @@ export const updateProjectStatus = async (projectId: string, newStatus: ProjectS
   if (!projectSnap.exists()) throw new Error('Project not found');
   
   const oldStatus = projectSnap.data().status as ProjectStatus;
-  
   const oldIdx = STATUS_ORDER.indexOf(oldStatus);
   const newIdx = STATUS_ORDER.indexOf(newStatus);
   
@@ -139,7 +176,7 @@ export const updateProjectStatus = async (projectId: string, newStatus: ProjectS
       projectId,
       userId: authorId,
       userName: authorName,
-      details: `Project status jumped from ${oldStatus} directly to ${newStatus}.`,
+      details: `Project status jumped from ${oldStatus} to ${newStatus}.`,
     });
   }
 
@@ -155,6 +192,33 @@ export const updateProjectStatus = async (projectId: string, newStatus: ProjectS
     authorName,
     isAnomaly
   });
+};
+
+// Activity & Audit
+export const addProjectActivity = async (projectId: string, activity: Omit<ProjectActivity, 'id' | 'timestamp'>) => {
+  return await addDoc(collection(db, 'mgmt_projects', projectId, 'activity'), {
+    ...activity,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const getProjectActivity = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_projects', projectId, 'activity'), orderBy('timestamp', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
+};
+
+export const logAuditEvent = async (event: Omit<AuditEntry, 'id' | 'timestamp'>) => {
+  return await addDoc(collection(db, 'mgmt_audit_log'), {
+    ...event,
+    timestamp: serverTimestamp(),
+  });
+};
+
+export const getAuditLogs = async (limitCount = 50) => {
+  const q = query(collection(db, 'mgmt_audit_log'), orderBy('timestamp', 'desc'), limit(limitCount));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AuditEntry[];
 };
 
 // Costing Engine
@@ -214,12 +278,40 @@ const recalculateCostingSet = async (setId: string) => {
   });
 };
 
-// Documents & Payments
-export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' | 'createdAt'>) => {
-  return await addDoc(collection(db, 'mgmt_documents'), {
-    ...docData,
+// Tasks
+export const getProjectTasks = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_tasks'), where('projectId', '==', projectId), orderBy('dueDate', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+};
+
+export const getUserTasks = async (userId: string) => {
+  const q = query(collection(db, 'mgmt_tasks'), where('assignedToId', '==', userId), where('status', 'in', ['pending', 'ready_for_verification']), orderBy('dueDate', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+};
+
+export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_tasks'), {
+    ...data,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
+};
+
+export const updateTask = async (taskId: string, data: Partial<Task>, authorId: string, authorName: string) => {
+  const taskRef = doc(db, 'mgmt_tasks', taskId);
+  await updateDoc(taskRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Documents & Payments
+export const getDocuments = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_documents'), where('projectId', '==', projectId), orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DocumentMetadata[];
 };
 
 export const getPaymentPlan = async (projectId: string) => {
@@ -239,95 +331,16 @@ export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan,
   });
 };
 
-// Activity & Audit Logging
-export const addProjectActivity = async (projectId: string, activity: Omit<ProjectActivity, 'id' | 'timestamp'>) => {
-  return await addDoc(collection(db, 'mgmt_projects', projectId, 'activity'), {
-    ...activity,
-    timestamp: serverTimestamp(),
-  });
-};
-
-export const getProjectActivity = async (projectId: string) => {
-  const q = query(collection(db, 'mgmt_projects', projectId, 'activity'), orderBy('timestamp', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ProjectActivity[];
-};
-
-export const logAuditEvent = async (event: Omit<AuditEntry, 'id' | 'timestamp'>) => {
-  return await addDoc(collection(db, 'mgmt_audit_log'), {
-    ...event,
-    timestamp: serverTimestamp(),
-  });
-};
-
-export const getAuditLogs = async (limitCount = 50) => {
-  const q = query(
-    collection(db, 'mgmt_audit_log'), 
-    orderBy('timestamp', 'desc'), 
-    limit(limitCount)
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AuditEntry[];
-};
-
-// Task Management
-export const getProjectTasks = async (projectId: string) => {
-  const q = query(
-    collection(db, 'mgmt_tasks'), 
-    where('projectId', '==', projectId),
-    orderBy('dueDate', 'asc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
-};
-
-export const getUserTasks = async (userId: string) => {
-  const q = query(
-    collection(db, 'mgmt_tasks'),
-    where('assignedToId', '==', userId),
-    where('status', 'in', ['pending', 'ready_for_verification']),
-    orderBy('dueDate', 'asc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
-};
-
-export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-  return await addDoc(collection(db, 'mgmt_tasks'), {
-    ...data,
+export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' | 'createdAt'>) => {
+  return await addDoc(collection(db, 'mgmt_documents'), {
+    ...docData,
     createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   });
 };
 
-export const updateTask = async (taskId: string, data: Partial<Task>, authorId: string, authorName: string) => {
-  const taskRef = doc(db, 'mgmt_tasks', taskId);
-  await updateDoc(taskRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
-
-  if (data.status) {
-    const taskSnap = await getDoc(taskRef);
-    const projectId = taskSnap.data()?.projectId;
-    if (projectId) {
-      await addProjectActivity(projectId, {
-        type: 'task_update',
-        content: `Task "${taskSnap.data()?.title}" status updated to ${data.status.replace('_', ' ')}`,
-        authorId,
-        authorName
-      });
-    }
-  }
-};
-
-// Analytics & Insights
+// Insights
 export const getLowMarginSets = async () => {
-  const q = query(
-    collection(db, 'mgmt_costing_sets'),
-    where('marginPercent', '<', 15),
-    limit(10)
-  );
+  const q = query(collection(db, 'mgmt_costing_sets'), where('marginPercent', '<', 15), limit(10));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
 };

@@ -46,11 +46,11 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
   useEffect(() => {
     if (project) {
       setFormData({
-        title: project.title,
-        customerName: project.customerDetails.name,
-        customerEmail: project.customerDetails.email,
-        customerPhone: project.customerDetails.phone || '',
-        category: project.category,
+        title: project.title || '',
+        customerName: project.customerDetails?.name || '',
+        customerEmail: project.customerDetails?.email || '',
+        customerPhone: project.customerDetails?.phone || '',
+        category: project.category || 'custom-tour',
         summary: project.notes || '',
       });
     }

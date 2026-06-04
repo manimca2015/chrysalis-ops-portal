@@ -27,19 +27,7 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /mgmt_costing_sets/{id} {
-      allow read, write: if true;
-    }
-
-    match /mgmt_costing_items/{id} {
-      allow read, write: if true;
-    }
-
-    match /mgmt_supplier_bills/{id} {
-      allow read, write: if true;
-    }
-
-    match /mgmt_supplier_payments/{id} {
+    match /mgmt_task_templates/{id} {
       allow read, write: if true;
     }
 
@@ -51,6 +39,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /mgmt_costing_sets/{id} {
+      allow read, write: if true;
+    }
+
+    match /mgmt_costing_items/{id} {
+      allow read, write: if true;
+    }
+
     match /mgmt_payment_plans/{id} {
       allow read, write: if true;
     }
@@ -59,7 +55,15 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Production users collection - required for the login custom claim check
+    match /mgmt_supplier_bills/{id} {
+      allow read, write: if true;
+    }
+
+    match /mgmt_supplier_payments/{id} {
+      allow read, write: if true;
+    }
+
+    // Production users collection - required for the login and seeding process
     match /users/{userId} {
       allow read, write: if true;
     }

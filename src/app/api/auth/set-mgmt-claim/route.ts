@@ -1,3 +1,4 @@
+
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     
     if (!userDoc.exists) {
       console.warn(`Auth Error: User record not found for UID ${uid}`);
-      return NextResponse.json({ error: 'User record not found in system database. Please initialize portal.' }, { status: 403 });
+      return NextResponse.json({ error: 'User record not found in system database. Please initialize portal at /admin/seed.' }, { status: 403 });
     }
 
     const userData = userDoc.data();
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       cookieStore.set('__session', sessionCookie, {
         maxAge: expiresIn,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: true, // Always true for Firebase App Hosting / Production environments
         sameSite: 'lax',
         path: '/',
       });

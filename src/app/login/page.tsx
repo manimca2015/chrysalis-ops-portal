@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from 'react';
@@ -45,14 +46,14 @@ export default function LoginPage() {
         throw new Error(data.error || 'Access denied. Please ensure system is initialized.');
       }
 
-      // 4. Success redirect
+      // 4. Success - use hard redirect to ensure cookie is sent in next request
       toast({
         title: "Authenticated",
-        description: "Welcome to Chrysalis Ops Portal.",
+        description: "Redirecting to Chrysalis Ops Portal...",
       });
       
-      router.push('/app/dashboard');
-      router.refresh(); 
+      // Force a full reload to the dashboard
+      window.location.href = '/app/dashboard';
     } catch (error: any) {
       console.error('Login Error:', error);
       toast({

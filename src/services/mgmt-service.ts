@@ -245,9 +245,16 @@ export const getAuditLogs = async (limitCount = 50) => {
 
 // Costing Engine
 export const getCostingSets = async (projectId: string) => {
-  const q = query(collection(db, 'mgmt_costing_sets'), where('projectId', '==', projectId), orderBy('createdAt', 'asc'));
+  // Removed orderBy to avoid composite index requirement
+  const q = query(collection(db, 'mgmt_costing_sets'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
+  const sets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
+  // Manual sort by createdAt
+  return sets.sort((a, b) => {
+    const timeA = a.createdAt?.toMillis?.() || 0;
+    const timeB = b.createdAt?.toMillis?.() || 0;
+    return timeA - timeB;
+  });
 };
 
 export const createCostingSet = async (projectId: string, name: string) => {
@@ -324,9 +331,16 @@ const recalculateCostingSet = async (setId: string) => {
 
 // Supplier Bills & Payments
 export const getSupplierBills = async (projectId: string) => {
-  const q = query(collection(db, 'mgmt_supplier_bills'), where('projectId', '==', projectId), orderBy('dueDate', 'asc'));
+  // Removed orderBy to avoid composite index requirement
+  const q = query(collection(db, 'mgmt_supplier_bills'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupplierBill[];
+  const bills = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupplierBill[];
+  // Manual sort by dueDate
+  return bills.sort((a, b) => {
+    const timeA = a.dueDate?.toMillis?.() || 0;
+    const timeB = b.dueDate?.toMillis?.() || 0;
+    return timeA - timeB;
+  });
 };
 
 export const createSupplierBill = async (projectId: string, bill: Omit<SupplierBill, 'id' | 'createdAt'>, authorId: string, authorName: string) => {
@@ -390,15 +404,29 @@ export const recordSupplierPayment = async (billId: string, payment: Omit<Suppli
 
 // Tasks
 export const getProjectTasks = async (projectId: string) => {
-  const q = query(collection(db, 'mgmt_tasks'), where('projectId', '==', projectId), orderBy('dueDate', 'asc'));
+  // Removed orderBy to avoid composite index requirement
+  const q = query(collection(db, 'mgmt_tasks'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+  const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+  // Manual sort by dueDate
+  return tasks.sort((a, b) => {
+    const timeA = a.dueDate?.toMillis?.() || 0;
+    const timeB = b.dueDate?.toMillis?.() || 0;
+    return timeA - timeB;
+  });
 };
 
 export const getUserTasks = async (userId: string) => {
-  const q = query(collection(db, 'mgmt_tasks'), where('assignedToId', '==', userId), where('status', 'in', ['pending', 'ready_for_verification']), orderBy('dueDate', 'asc'));
+  // Removed orderBy to avoid composite index requirement
+  const q = query(collection(db, 'mgmt_tasks'), where('assignedToId', '==', userId), where('status', 'in', ['pending', 'ready_for_verification']));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+  const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
+  // Manual sort by dueDate
+  return tasks.sort((a, b) => {
+    const timeA = a.dueDate?.toMillis?.() || 0;
+    const timeB = b.dueDate?.toMillis?.() || 0;
+    return timeA - timeB;
+  });
 };
 
 export const createTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {

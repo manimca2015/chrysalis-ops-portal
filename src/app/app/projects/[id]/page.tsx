@@ -116,11 +116,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 uppercase">
-              {project.category.replace('-', ' ')}
+              {project.category?.replace('-', ' ') || 'Category'}
             </Badge>
             <span className="text-sm text-muted-foreground font-mono">ID: {project.id.slice(0, 8)}</span>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">{project.title}</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">{project.title || 'Untitled Project'}</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => setIsEditModalOpen(true)}><Edit3 size={14} className="mr-2" /> Edit</Button>
@@ -163,11 +163,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   <CardContent className="space-y-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-black">
-                        {project.customerDetails.name.charAt(0)}
+                        {(project.customerDetails?.name || 'U').charAt(0)}
                       </div>
                       <div>
-                        <p className="font-bold">{project.customerDetails.name}</p>
-                        <p className="text-xs text-muted-foreground">{project.customerDetails.email}</p>
+                        <p className="font-bold">{project.customerDetails?.name || 'Unknown Customer'}</p>
+                        <p className="text-xs text-muted-foreground">{project.customerDetails?.email || 'No Email Provided'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -250,7 +250,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           <History size={16} className="text-muted-foreground mt-1" />
                           <div>
                             <p className="text-sm font-medium">{item.content}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase font-bold">{item.authorName} • {format(item.timestamp.toDate(), 'dd MMM HH:mm')}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">{item.authorName} • {item.timestamp ? format(item.timestamp.toDate(), 'dd MMM HH:mm') : 'Just now'}</p>
                           </div>
                         </div>
                       ))}
@@ -281,12 +281,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
            <Card>
              <CardHeader><CardTitle className="text-sm">Team Assignments</CardTitle></CardHeader>
              <CardContent className="space-y-3">
-               {project.teamAssignments.map((a, i) => (
+               {project.teamAssignments?.length > 0 ? project.teamAssignments.map((a, i) => (
                  <div key={i} className="flex justify-between items-center text-xs">
                    <span className="font-bold">{a.staffName}</span>
                    <Badge variant="secondary" className="text-[8px] uppercase">{a.role}</Badge>
                  </div>
-               ))}
+               )) : (
+                 <p className="text-xs text-muted-foreground italic">No staff assigned yet.</p>
+               )}
              </CardContent>
            </Card>
         </div>

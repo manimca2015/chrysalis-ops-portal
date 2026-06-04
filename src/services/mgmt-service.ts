@@ -1,4 +1,3 @@
-
 import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
@@ -86,6 +85,7 @@ export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'up
       updatedAt: serverTimestamp(),
     });
     
+    // Attempt to log initial activity
     try {
       await addProjectActivity(docRef.id, {
         type: 'system',

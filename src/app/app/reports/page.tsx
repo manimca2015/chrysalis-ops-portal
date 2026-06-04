@@ -1,6 +1,9 @@
 
 "use client"
 
+import React, { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getProjects, getAllCostingSets } from '@/services/mgmt-service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   BarChart, 
@@ -10,78 +13,157 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  LineChart, 
-  Line,
   Cell,
   PieChart,
   Pie
 } from 'recharts';
 import { 
-  TrendingUp, 
-  Users, 
   Briefcase, 
   DollarSign, 
   Download,
   Calendar,
   Filter,
-  FileText
+  FileText,
+  Loader2,
+  TrendingUp,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
-const PERFORMANCE_DATA = [
-  { month: 'Jan', revenue: 45000, projects: 12 },
-  { month: 'Feb', revenue: 52000, projects: 15 },
-  { month: 'Mar', revenue: 48000, projects: 10 },
-  { month: 'Apr', revenue: 61000, projects: 18 },
-  { month: 'May', revenue: 55000, projects: 14 },
-  { month: 'Jun', revenue: 67000, projects: 22 },
-];
-
-const CATEGORY_DATA = [
-  { name: 'Custom Tours', value: 40, color: '#2D5A69' },
-  { name: 'Corporate', value: 30, color: '#61CCB3' },
-  { name: 'Educational', value: 20, color: '#FFA500' },
-  { name: 'Transport', value: 10, color: '#94a3b8' },
-];
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths } from 'date-fns';
 
 export default function ReportsPage() {
+  const { data: projects, isLoading: projectsLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: getProjects,
+  });
+
+  const { data: costingSets, isLoading: costingLoading } = useQuery({
+    queryKey: ['all-costing-sets'],
+    queryFn: getAllCostingSets,
+  });
+
+  // Derived Analytics
+  const analytics = useMemo(() => {
+    if (!projects || !costingSets) return null;
+
+    // 1. Total Financials (Sum of winning costing sets)
+    const totalRevenue = costingSets.reduce((sum, set) => sum + set.totalSellingSgd, 0);
+    const totalProfit = costingSets.reduce((sum, set) => sum + set.profitSgd, 0);
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    // 2. Category Distribution
+    const categories: Record<string, number> = {};
+    projects.forEach(p => {
+      const cat = p.category.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
+      categories[cat] = (categories[cat] || 0) + 1;
+    });
+
+    const categoryData = Object.entries(categories).map(([name, value], idx) => ({
+      name,
+      value,
+      color: ['#2D5A69', '#61CCB3', '#FFA500', '#94a3b8', '#F43F5E'][idx % 5]
+    }));
+
+    // 3. Performance Data (Revenue by month for last 6 months)
+    const now = new Date();
+    const performanceData = Array.from({ length: 6 }).map((_, i) => {
+      const date = subMonths(now, 5 - i);
+      const start = startOfMonth(date);
+      const end = endOfMonth(date);
+      
+      const monthRevenue = costingSets
+        .filter(set => {
+          const createdAt = set.createdAt?.toDate();
+          return createdAt && isWithinInterval(createdAt, { start, end });
+        })
+        .reduce((sum, set) => sum + set.totalSellingSgd, 0);
+
+      return {
+        month: format(date, 'MMM'),
+        revenue: monthRevenue,
+        projects: projects.filter(p => {
+          const createdAt = p.createdAt?.toDate();
+          return createdAt && isWithinInterval(createdAt, { start, end });
+        }).length
+      };
+    });
+
+    return {
+      totalRevenue,
+      totalProfit,
+      avgMargin,
+      categoryData,
+      performanceData,
+      totalProjects: projects.length,
+      activeProjects: projects.filter(p => !['completed', 'archived'].includes(p.status)).length
+    };
+  }, [projects, costingSets]);
+
+  if (projectsLoading || costingLoading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={48} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">Business Insights</h1>
-          <p className="text-muted-foreground">Strategic reporting and performance analysis.</p>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">Business Intelligence</h1>
+          <p className="text-muted-foreground">Real-time portfolio performance and financial monitoring.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2">
             <Filter size={14} /> Filter Period
           </Button>
           <Button size="sm" className="gap-2 bg-primary text-primary-foreground">
-            <Download size={14} /> Export Report
+            <Download size={14} /> Export CSV
           </Button>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard title="Total Revenue" value="$328,000" subValue="+12.5% vs last qtr" icon={DollarSign} />
-        <StatsCard title="Active Projects" value="84" subValue="14 new this month" icon={Briefcase} />
-        <StatsCard title="Client Satisfaction" value="4.8/5" subValue="Based on 156 reviews" icon={Users} />
-        <StatsCard title="Avg Project Cycle" value="22 Days" subValue="-2 days improvement" icon={Calendar} />
+        <StatsCard 
+          title="Total Portfolio Value" 
+          value={`$${(analytics?.totalRevenue || 0).toLocaleString()}`} 
+          subValue="Revenue across all scenarios" 
+          icon={DollarSign} 
+        />
+        <StatsCard 
+          title="Active Projects" 
+          value={analytics?.activeProjects || 0} 
+          subValue={`${analytics?.totalProjects} total in database`} 
+          icon={Briefcase} 
+        />
+        <StatsCard 
+          title="Net Profit (Est)" 
+          value={`$${(analytics?.totalProfit || 0).toLocaleString()}`} 
+          subValue="Projected earnings" 
+          icon={TrendingUp} 
+        />
+        <StatsCard 
+          title="Avg Margin" 
+          value={`${(analytics?.avgMargin || 0).toFixed(1)}%`} 
+          subValue="Target: 15%+" 
+          icon={PieChartIcon} 
+        />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="border-none shadow-sm">
+        <Card className="border-none shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="text-lg">Revenue vs Projects Trend</CardTitle>
-            <CardDescription>Monthly performance overview</CardDescription>
+            <CardTitle className="text-lg">Revenue Pipeline</CardTitle>
+            <CardDescription>Monthly revenue trends for the last 6 months</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={PERFORMANCE_DATA}>
+              <BarChart data={analytics?.performanceData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${val/1000}k`} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `$${(val/1000).toFixed(0)}k`} />
                 <Tooltip 
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   cursor={{ fill: 'rgba(0,0,0,0.05)' }}
@@ -92,22 +174,22 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm">
+        <Card className="border-none shadow-sm bg-white">
           <CardHeader>
             <CardTitle className="text-lg">Project Distribution</CardTitle>
-            <CardDescription>Volume by category</CardDescription>
+            <CardDescription>Breakdown by service category</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] flex items-center">
              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={CATEGORY_DATA}
+                    data={analytics?.categoryData}
                     innerRadius={60}
                     outerRadius={100}
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {CATEGORY_DATA.map((entry, index) => (
+                    {analytics?.categoryData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -115,10 +197,13 @@ export default function ReportsPage() {
                 </PieChart>
              </ResponsiveContainer>
              <div className="space-y-2 min-w-[140px]">
-               {CATEGORY_DATA.map(item => (
-                 <div key={item.name} className="flex items-center gap-2">
-                   <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                   <span className="text-xs font-medium">{item.name}</span>
+               {analytics?.categoryData.map((item: any) => (
+                 <div key={item.name} className="flex items-center justify-between gap-2">
+                   <div className="flex items-center gap-2">
+                     <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                     <span className="text-xs font-medium">{item.name}</span>
+                   </div>
+                   <span className="text-xs font-bold">{item.value}</span>
                  </div>
                ))}
              </div>
@@ -126,17 +211,17 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm">
+      <Card className="border-none shadow-sm bg-white">
         <CardHeader>
-          <CardTitle className="text-lg">Scheduled Reports</CardTitle>
-          <CardDescription>Automated operational summaries sent to management.</CardDescription>
+          <CardTitle className="text-lg">Recent System Reports</CardTitle>
+          <CardDescription>Automated operational summaries and export history.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
             {[
-              { name: 'Weekly Operational Health', freq: 'Every Monday', recipients: '3 Admins' },
-              { name: 'Monthly Financial Summary', freq: '1st of Month', recipients: 'Financial Lead' },
-              { name: 'Quarterly Supplier Audit', freq: 'Every Quarter', recipients: 'Procurement Team' }
+              { name: 'Monthly Financial Summary', freq: 'Aug 2024', recipients: 'Admin Team' },
+              { name: 'Supplier Costing Audit', freq: 'Jul 2024', recipients: 'Staff' },
+              { name: 'Annual Performance Review', freq: '2023 FY', recipients: 'Management' }
             ].map((report, idx) => (
               <div key={idx} className="flex items-center justify-between p-4 px-6 hover:bg-muted/30 transition-colors">
                 <div className="flex items-center gap-3">
@@ -145,10 +230,12 @@ export default function ReportsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-bold">{report.name}</p>
-                    <p className="text-xs text-muted-foreground">{report.freq} • {report.recipients}</p>
+                    <p className="text-xs text-muted-foreground">{report.freq} • Shared with {report.recipients}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm">Edit Schedule</Button>
+                <Button variant="ghost" size="sm" className="gap-2">
+                   <Download size={14} /> Download
+                </Button>
               </div>
             ))}
           </div>
@@ -169,7 +256,7 @@ function StatsCard({ title, value, subValue, icon: Icon }: any) {
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold mb-1">{value}</div>
-        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-tighter">{subValue}</p>
+        <p className="text-[10px] text-accent font-bold uppercase tracking-tighter">{subValue}</p>
       </CardContent>
     </Card>
   );

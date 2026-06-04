@@ -254,6 +254,12 @@ export const getCostingSets = async (projectId: string) => {
   });
 };
 
+export const getAllCostingSets = async () => {
+  const q = query(collection(db, 'mgmt_costing_sets'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
+};
+
 export const createCostingSet = async (projectId: string, name: string) => {
   return await addDoc(collection(db, 'mgmt_costing_sets'), {
     projectId,

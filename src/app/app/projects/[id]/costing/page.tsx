@@ -26,7 +26,7 @@ import {
   TableHead, 
   TableHeader, 
   TableRow 
-} from '@/table';
+} from '@/components/ui/table';
 import { 
   Select, 
   SelectContent, 
@@ -47,7 +47,8 @@ import {
   CheckCircle2,
   Info,
   Sparkles,
-  Zap
+  Zap,
+  ChevronRight
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';

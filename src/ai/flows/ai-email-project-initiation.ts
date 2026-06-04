@@ -30,6 +30,7 @@ export async function initiateProjectFromEmail(input: EmailProjectInitiationInpu
 
 const prompt = ai.definePrompt({
   name: 'emailProjectInitiationPrompt',
+  model: 'googleai/gemini-1.5-flash',
   input: {schema: EmailProjectInitiationInputSchema},
   output: {schema: EmailProjectInitiationOutputSchema},
   prompt: `You are an AI assistant specialized in extracting key information from customer inquiry emails to facilitate project initiation for a tour company.

@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from 'react';
@@ -32,7 +31,9 @@ import {
   FileQuestion,
   Plus,
   Trash2,
-  Save
+  Save,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,9 +75,16 @@ export default function AdminSecurityPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight font-headline">System Administration</h1>
-        <p className="text-muted-foreground">Manage templates, monitor audit logs, and control staff access.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight font-headline">System Administration</h1>
+          <p className="text-muted-foreground">Manage system integrity, audit trails, and staff access.</p>
+        </div>
+        <div className="flex items-center gap-2">
+           <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 h-6">
+              <ShieldCheck size={14} /> System Secure
+           </Badge>
+        </div>
       </div>
 
       <Tabs defaultValue="audit" className="space-y-4">
@@ -88,7 +96,8 @@ export default function AdminSecurityPage() {
 
         <TabsContent value="audit">
            <div className="grid gap-6 md:grid-cols-3 mb-6">
-              <Card className="bg-white border-none shadow-sm">
+              <Card className="bg-white border-none shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-destructive" />
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-2">
                     <ShieldAlert size={14} className="text-destructive" /> Critical Alerts
@@ -96,75 +105,81 @@ export default function AdminSecurityPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-4xl font-black text-destructive">{criticalEvents.length}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">Unauthorized or risky attempts</p>
                 </CardContent>
               </Card>
-              <Card className="bg-white border-none shadow-sm">
+              <Card className="bg-white border-none shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500" />
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-2">
-                    <AlertTriangle size={14} className="text-orange-500" /> Anomalies
+                    <AlertTriangle size={14} className="text-orange-500" /> System Warnings
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-4xl font-black text-orange-500">{warningEvents.length}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">Status jumps & financial overrides</p>
                 </CardContent>
               </Card>
-              <Card className="bg-white border-none shadow-sm">
+              <Card className="bg-white border-none shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs uppercase font-bold tracking-widest text-muted-foreground flex items-center gap-2">
-                    <Activity size={14} className="text-primary" /> Total Logs
+                    <Zap size={14} className="text-primary" /> Operational Logs
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-4xl font-black text-primary">{logs?.length || 0}</div>
+                  <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold">Total immutable records</p>
                 </CardContent>
               </Card>
             </div>
 
           <Card className="border-none shadow-sm overflow-hidden bg-white">
-            <CardHeader>
-              <CardTitle className="text-lg">Immutable Operations Log</CardTitle>
-              <CardDescription>Real-time stream of administrative and security events.</CardDescription>
+            <CardHeader className="border-b bg-muted/20">
+              <CardTitle className="text-lg">Immutable Operations Trail</CardTitle>
+              <CardDescription>Comprehensive stream of system and security events.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead>Event</TableHead>
-                    <TableHead>Severity</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>Initiated By</TableHead>
-                    <TableHead>Timestamp</TableHead>
+                  <TableRow className="bg-muted/50 border-b">
+                    <TableHead className="text-[10px] uppercase font-bold">Event</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold">Severity</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold">Details</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold">Staff Member</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold">Timestamp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logsLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8">Loading logs...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12"><Activity className="animate-spin mx-auto text-primary" /></TableCell></TableRow>
                   ) : logs?.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground italic">No audit records found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No audit records found in the last 100 events.</TableCell></TableRow>
                   ) : logs?.map((log) => (
-                    <TableRow key={log.id} className="text-xs">
-                      <TableCell className="font-bold uppercase tracking-tighter">
+                    <TableRow key={log.id} className={log.severity === 'critical' ? 'bg-destructive/5' : log.severity === 'warning' ? 'bg-orange-50/50' : ''}>
+                      <TableCell className="font-bold uppercase tracking-tighter text-[10px]">
                         {log.event.replace('_', ' ')}
                       </TableCell>
                       <TableCell>
                         <Badge 
                           variant={log.severity === 'critical' ? 'destructive' : log.severity === 'warning' ? 'secondary' : 'outline'}
-                          className="text-[8px] h-4"
+                          className="text-[8px] h-4 font-black"
                         >
-                          {log.severity}
+                          {log.severity.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-[300px] truncate font-medium text-muted-foreground">
+                      <TableCell className="max-w-[400px] text-xs font-medium text-foreground/80">
                         {log.details}
+                        {log.projectId && <div className="text-[8px] text-muted-foreground mt-0.5">Project: {log.projectId.slice(0, 8)}...</div>}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-bold">{log.userName}</span>
-                          <span className="text-[10px] text-muted-foreground">UID: {log.userId.slice(0, 8)}</span>
+                          <span className="font-bold text-xs">{log.userName}</span>
+                          <span className="text-[9px] text-muted-foreground font-mono">UID: {log.userId.slice(0, 6)}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {log.timestamp ? format(log.timestamp.toDate(), 'dd MMM, HH:mm') : '-'}
+                      <TableCell className="text-muted-foreground text-[10px] font-medium">
+                        {log.timestamp ? format(log.timestamp.toDate(), 'dd MMM yyyy, HH:mm') : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -178,8 +193,8 @@ export default function AdminSecurityPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-1 border-none shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Create Template</CardTitle>
-                <CardDescription>Add new questionnaire templates by category.</CardDescription>
+                <CardTitle className="text-lg">Template Studio</CardTitle>
+                <CardDescription>Design questionnaire sets for staff to use.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -187,9 +202,8 @@ export default function AdminSecurityPage() {
                   <Input value={newTpl.title} onChange={e => setNewTpl({...newTpl, title: e.target.value})} placeholder="e.g. Corporate Incentive Tour" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category Slug</Label>
-                  <Input value={newTpl.category} onChange={e => setNewTpl({...newTpl, category: e.target.value})} placeholder="e.g. corporate, education" />
-                  <p className="text-[10px] text-muted-foreground">Use lowercase slugs for matching project categories.</p>
+                  <Label>Category</Label>
+                  <Input value={newTpl.category} onChange={e => setNewTpl({...newTpl, category: e.target.value})} placeholder="e.g. corporate" />
                 </div>
                 <div className="space-y-2">
                   <Label>Questions</Label>
@@ -199,7 +213,7 @@ export default function AdminSecurityPage() {
                         const qs = [...newTpl.questions];
                         qs[idx] = e.target.value;
                         setNewTpl({...newTpl, questions: qs});
-                      }} placeholder="e.g. What is your estimated budget?" />
+                      }} placeholder="Question text..." />
                       <Button variant="ghost" size="icon" onClick={() => setNewTpl({...newTpl, questions: newTpl.questions.filter((_, i) => i !== idx)})}>
                         <Trash2 size={14} className="text-destructive" />
                       </Button>
@@ -215,14 +229,9 @@ export default function AdminSecurityPage() {
               </CardContent>
             </Card>
 
-            <div className="lg:col-span-2 space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-1">Existing Templates</h3>
-              {questionnaireTemplates?.length === 0 ? (
-                <div className="py-20 text-center bg-white rounded-lg border border-dashed text-muted-foreground">
-                   No templates created yet.
-                </div>
-              ) : questionnaireTemplates?.map(tpl => (
-                <Card key={tpl.id} className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit">
+              {questionnaireTemplates?.map(tpl => (
+                <Card key={tpl.id} className="bg-white border-none shadow-sm hover:shadow-md transition-shadow h-fit">
                   <CardHeader className="flex flex-row items-center justify-between py-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -234,7 +243,7 @@ export default function AdminSecurityPage() {
                   </CardHeader>
                   <CardContent className="pb-4">
                     <ul className="text-xs space-y-1 text-muted-foreground list-disc pl-4">
-                      {tpl.questions.slice(0, 3).map((q, i) => <li key={i}>{q}</li>)}
+                      {tpl.questions.slice(0, 3).map((q, i) => <li key={i} className="line-clamp-1">{q}</li>)}
                       {tpl.questions.length > 3 && <li className="italic">+ {tpl.questions.length - 3} more</li>}
                     </ul>
                   </CardContent>
@@ -250,14 +259,14 @@ export default function AdminSecurityPage() {
               <Card key={person.id} className="shadow-sm border-none bg-white">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg font-bold">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary text-lg font-black uppercase">
                       {person.name.charAt(0)}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold">{person.name}</h3>
-                      <p className="text-xs text-muted-foreground">{person.email}</p>
+                    <div className="flex-1 overflow-hidden">
+                      <h3 className="font-bold truncate">{person.name}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{person.email}</p>
                     </div>
-                    <Badge variant="outline" className="capitalize text-[10px]">{person.role}</Badge>
+                    <Badge variant="outline" className="capitalize text-[8px] font-black h-5">{person.role}</Badge>
                   </div>
                 </CardContent>
               </Card>

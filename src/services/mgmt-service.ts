@@ -1,4 +1,3 @@
-
 import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
@@ -190,7 +189,7 @@ export const updateProjectStatus = async (projectId: string, newStatus: ProjectS
   const newIdx = STATUS_ORDER.indexOf(newStatus);
   
   let isAnomaly = false;
-  if (newIdx > oldIdx + 1 && newStatus !== 'archived') {
+  if (newIdx > oldIdx + 1 && newStatus !== 'archived' && newStatus !== 'completed') {
     isAnomaly = true;
     await logAuditEvent({
       event: 'status_jump',
@@ -245,11 +244,9 @@ export const getAuditLogs = async (limitCount = 50) => {
 
 // Costing Engine
 export const getCostingSets = async (projectId: string) => {
-  // Removed orderBy to avoid composite index requirement
   const q = query(collection(db, 'mgmt_costing_sets'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
   const sets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CostingSet[];
-  // Manual sort by createdAt
   return sets.sort((a, b) => {
     const timeA = a.createdAt?.toMillis?.() || 0;
     const timeB = b.createdAt?.toMillis?.() || 0;
@@ -304,6 +301,21 @@ export const addCostingItem = async (setId: string, item: Omit<CostingItem, 'id'
     ...item,
     costingSetId: setId,
   });
+  
+  if (item.isManualOverride) {
+    const setSnap = await getDoc(doc(db, 'mgmt_costing_sets', setId));
+    if (setSnap.exists()) {
+      await logAuditEvent({
+        event: 'financial_override',
+        severity: 'info',
+        projectId: setSnap.data().projectId,
+        userId: 'system', // Ideally passed from UI
+        userName: 'Staff',
+        details: `Manual price override for ${item.description}: ${item.currency} ${item.unitCost}`,
+      });
+    }
+  }
+
   await recalculateCostingSet(setId);
   return docRef;
 };
@@ -331,11 +343,9 @@ const recalculateCostingSet = async (setId: string) => {
 
 // Supplier Bills & Payments
 export const getSupplierBills = async (projectId: string) => {
-  // Removed orderBy to avoid composite index requirement
   const q = query(collection(db, 'mgmt_supplier_bills'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
   const bills = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupplierBill[];
-  // Manual sort by dueDate
   return bills.sort((a, b) => {
     const timeA = a.dueDate?.toMillis?.() || 0;
     const timeB = b.dueDate?.toMillis?.() || 0;
@@ -378,7 +388,6 @@ export const recordSupplierPayment = async (billId: string, payment: Omit<Suppli
   const billRef = doc(db, 'mgmt_supplier_bills', billId);
   await updateDoc(billRef, { status: 'paid' });
 
-  // Get bill to find project ID
   const billSnap = await getDoc(billRef);
   if (billSnap.exists()) {
     const bill = billSnap.data() as SupplierBill;
@@ -404,11 +413,9 @@ export const recordSupplierPayment = async (billId: string, payment: Omit<Suppli
 
 // Tasks
 export const getProjectTasks = async (projectId: string) => {
-  // Removed orderBy to avoid composite index requirement
   const q = query(collection(db, 'mgmt_tasks'), where('projectId', '==', projectId));
   const snapshot = await getDocs(q);
   const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
-  // Manual sort by dueDate
   return tasks.sort((a, b) => {
     const timeA = a.dueDate?.toMillis?.() || 0;
     const timeB = b.dueDate?.toMillis?.() || 0;
@@ -417,11 +424,9 @@ export const getProjectTasks = async (projectId: string) => {
 };
 
 export const getUserTasks = async (userId: string) => {
-  // Removed orderBy to avoid composite index requirement
   const q = query(collection(db, 'mgmt_tasks'), where('assignedToId', '==', userId), where('status', 'in', ['pending', 'ready_for_verification']));
   const snapshot = await getDocs(q);
   const tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Task[];
-  // Manual sort by dueDate
   return tasks.sort((a, b) => {
     const timeA = a.dueDate?.toMillis?.() || 0;
     const timeB = b.dueDate?.toMillis?.() || 0;
@@ -463,17 +468,37 @@ export const getPaymentPlan = async (projectId: string) => {
 
 export const savePaymentPlan = async (projectId: string, plan: Omit<PaymentPlan, 'id' | 'updatedAt'>) => {
   const docRef = doc(db, 'mgmt_payment_plans', projectId);
-  return await setDoc(docRef, {
+  await setDoc(docRef, {
     ...plan,
     updatedAt: serverTimestamp(),
+  });
+  
+  await logAuditEvent({
+    event: 'financial_override',
+    severity: 'info',
+    projectId,
+    userId: 'system',
+    userName: 'Staff',
+    details: `Payment plan updated with ${plan.installments.length} milestones.`,
   });
 };
 
 export const logDocumentCreation = async (docData: Omit<DocumentMetadata, 'id' | 'createdAt'>) => {
-  return await addDoc(collection(db, 'mgmt_documents'), {
+  const docRef = await addDoc(collection(db, 'mgmt_documents'), {
     ...docData,
     createdAt: serverTimestamp(),
   });
+
+  await logAuditEvent({
+    event: 'document_generated',
+    severity: 'info',
+    projectId: docData.projectId,
+    userId: 'system',
+    userName: 'Staff',
+    details: `Generated ${docData.type}: ${docData.title}`,
+  });
+
+  return docRef;
 };
 
 // Insights

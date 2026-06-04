@@ -35,7 +35,7 @@ export interface ProjectAssignment {
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly' | 'questionnaire_sent';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly' | 'questionnaire_sent' | 'bill_added' | 'payment_recorded';
   content: string;
   authorId: string;
   authorName: string;
@@ -111,11 +111,31 @@ export interface Task {
   updatedAt: any;
 }
 
+export interface SupplierService {
+  id: string;
+  name: string;
+  cost: number;
+  currency: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  location: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  tags: string[];
+  services: SupplierService[];
+  updatedAt: any;
+}
+
 export interface CostingItem {
   id: string;
   costingSetId: string;
   supplierId?: string;
   supplierName: string;
+  serviceId?: string;
   description: string;
   unitCost: number;
   quantity: number;
@@ -136,8 +156,36 @@ export interface CostingSet {
   totalSellingSgd: number;
   profitSgd: number;
   marginPercent: number;
+  exchangeRateManual?: number;
   createdAt: any;
   updatedAt: any;
+}
+
+export interface SupplierBill {
+  id: string;
+  projectId: string;
+  costingItemId: string;
+  supplierId: string;
+  supplierName: string;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  issueDate: any;
+  dueDate: any;
+  status: 'awaiting_payment' | 'paid' | 'overdue';
+  fileUrl?: string;
+  createdAt: any;
+}
+
+export interface SupplierPayment {
+  id: string;
+  billId: string;
+  amount: number;
+  date: any;
+  method: string;
+  proofUrl?: string;
+  recordedBy: string;
+  recordedByName: string;
 }
 
 export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt' | 'client_file';
@@ -172,7 +220,16 @@ export interface PaymentPlan {
   updatedAt: any;
 }
 
-export type AuditEventType = 'auth_login' | 'auth_logout' | 'financial_override' | 'status_jump' | 'deletion' | 'settings_change' | 'clone_project';
+export type AuditEventType = 
+  | 'auth_login' 
+  | 'auth_logout' 
+  | 'financial_override' 
+  | 'status_jump' 
+  | 'deletion' 
+  | 'settings_change' 
+  | 'clone_project'
+  | 'bill_created'
+  | 'supplier_payment';
 
 export interface AuditEntry {
   id: string;

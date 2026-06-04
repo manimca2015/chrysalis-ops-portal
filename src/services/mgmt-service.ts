@@ -31,7 +31,10 @@ import {
   AuditEntry,
   Enquiry,
   QuestionnaireTemplate,
-  TaskTemplate
+  TaskTemplate,
+  Supplier,
+  SupplierBill,
+  SupplierPayment
 } from '@/types';
 
 const { db } = initializeFirebase();
@@ -58,6 +61,20 @@ export const upsertStaffProfile = async (uid: string, data: Partial<StaffProfile
     ...data,
     updatedAt: serverTimestamp(),
   }, { merge: true });
+};
+
+// Suppliers
+export const getSuppliers = async () => {
+  const q = query(collection(db, 'mgmt_suppliers'), orderBy('name', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Supplier[];
+};
+
+export const addSupplier = async (data: Omit<Supplier, 'id' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_suppliers'), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
 };
 
 // Enquiries
@@ -92,12 +109,6 @@ export const saveQuestionnaireTemplate = async (data: Omit<QuestionnaireTemplate
   });
 };
 
-export const getTaskTemplates = async () => {
-  const q = query(collection(db, 'mgmt_task_templates'), orderBy('category', 'asc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TaskTemplate[];
-};
-
 // Projects
 export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
   const docRef = await addDoc(collection(db, 'mgmt_projects'), {
@@ -129,6 +140,17 @@ export const cloneProject = async (projectId: string, authorId: string, authorNa
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+  // Clone costing sets
+  const sets = await getCostingSets(projectId);
+  for (const set of sets) {
+    const newSetRef = await createCostingSet(docRef.id, set.name);
+    const items = await getCostingItems(set.id);
+    for (const item of items) {
+      const { id: itemId, costingSetId, ...itemData } = item;
+      await addCostingItem(newSetRef.id, itemData);
+    }
+  }
 
   await logAuditEvent({
     event: 'clone_project',
@@ -242,6 +264,28 @@ export const createCostingSet = async (projectId: string, name: string) => {
   });
 };
 
+export const duplicateCostingSet = async (setId: string, newName: string) => {
+  const setRef = doc(db, 'mgmt_costing_sets', setId);
+  const setSnap = await getDoc(setRef);
+  if (!setSnap.exists()) throw new Error('Set not found');
+
+  const { id, createdAt, updatedAt, ...setData } = setSnap.data();
+  const newSetRef = await addDoc(collection(db, 'mgmt_costing_sets'), {
+    ...setData,
+    name: newName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  const items = await getCostingItems(setId);
+  for (const item of items) {
+    const { id: itemId, costingSetId, ...itemData } = item;
+    await addCostingItem(newSetRef.id, itemData);
+  }
+
+  return newSetRef.id;
+};
+
 export const getCostingItems = async (setId: string) => {
   const q = query(collection(db, 'mgmt_costing_items'), where('costingSetId', '==', setId));
   const snapshot = await getDocs(q);
@@ -276,6 +320,72 @@ const recalculateCostingSet = async (setId: string) => {
     marginPercent: margin,
     updatedAt: serverTimestamp(),
   });
+};
+
+// Supplier Bills & Payments
+export const getSupplierBills = async (projectId: string) => {
+  const q = query(collection(db, 'mgmt_supplier_bills'), where('projectId', '==', projectId), orderBy('dueDate', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as SupplierBill[];
+};
+
+export const createSupplierBill = async (projectId: string, bill: Omit<SupplierBill, 'id' | 'createdAt'>, authorId: string, authorName: string) => {
+  const docRef = await addDoc(collection(db, 'mgmt_supplier_bills'), {
+    ...bill,
+    createdAt: serverTimestamp(),
+  });
+
+  await addProjectActivity(projectId, {
+    type: 'bill_added',
+    content: `Supplier bill added: ${bill.supplierName} - ${bill.invoiceNumber}`,
+    authorId,
+    authorName
+  });
+
+  await logAuditEvent({
+    event: 'bill_created',
+    severity: 'info',
+    projectId,
+    userId: authorId,
+    userName: authorName,
+    details: `Supplier bill created for ${bill.supplierName} (Inv: ${bill.invoiceNumber})`,
+  });
+
+  return docRef;
+};
+
+export const recordSupplierPayment = async (billId: string, payment: Omit<SupplierPayment, 'id'>, authorId: string, authorName: string) => {
+  const docRef = await addDoc(collection(db, 'mgmt_supplier_payments'), {
+    ...payment,
+    recordedBy: authorId,
+    recordedByName: authorName
+  });
+
+  const billRef = doc(db, 'mgmt_supplier_bills', billId);
+  await updateDoc(billRef, { status: 'paid' });
+
+  // Get bill to find project ID
+  const billSnap = await getDoc(billRef);
+  if (billSnap.exists()) {
+    const bill = billSnap.data() as SupplierBill;
+    await addProjectActivity(bill.projectId, {
+      type: 'payment_recorded',
+      content: `Supplier payment recorded: ${bill.supplierName} - ${bill.invoiceNumber}`,
+      authorId,
+      authorName
+    });
+
+    await logAuditEvent({
+      event: 'supplier_payment',
+      severity: 'info',
+      projectId: bill.projectId,
+      userId: authorId,
+      userName: authorName,
+      details: `Payment of ${payment.amount} recorded for bill ${bill.invoiceNumber}`,
+    });
+  }
+
+  return docRef;
 };
 
 // Tasks

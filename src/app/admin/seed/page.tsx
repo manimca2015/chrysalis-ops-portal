@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState } from 'react';
@@ -8,18 +7,30 @@ import { upsertStaffProfile, addSupplier } from '@/services/mgmt-service';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function SeedAdminPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
+  // This is the UID that the portal expects for the admin account
   const targetUid = 'O9vpTjrJXyX8G1dcZ5SwBnfCQ2l1';
 
   const handleSeed = async () => {
     setLoading(true);
     try {
-      // Create Admin
+      // 1. Create the production user record (needed for the set-mgmt-claim API)
+      await setDoc(doc(db, 'users', targetUid), {
+        email: 'admin@chrysalistours.sg',
+        name: 'Chrysalis Admin',
+        role: 'Admin',
+        status: 'Publish',
+        createdAt: new Date().toISOString()
+      });
+
+      // 2. Create the Internal Staff Profile
       await upsertStaffProfile(targetUid, {
         email: 'admin@chrysalistours.sg',
         name: 'Chrysalis Admin',
@@ -27,7 +38,7 @@ export default function SeedAdminPage() {
         avatarUrl: 'https://picsum.photos/seed/admin/200/200'
       });
 
-      // Seed dummy suppliers for testing Module 3
+      // 3. Seed demo suppliers for Module 3
       await addSupplier({
         name: 'Marina Bay Sands',
         location: 'Singapore',
@@ -57,9 +68,10 @@ export default function SeedAdminPage() {
       setSuccess(true);
       toast({
         title: "System Initialized",
-        description: `Admin profile and demo suppliers created.`,
+        description: `Admin profile, production user, and demo suppliers created.`,
       });
     } catch (error: any) {
+      console.error('Seeding error:', error);
       toast({
         variant: "destructive",
         title: "Seeding Failed",
@@ -79,7 +91,7 @@ export default function SeedAdminPage() {
             System Initialization
           </CardTitle>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Create your admin profile and seed initial supplier data for testing Module 3.
+            This will set up the Admin account (UID: {targetUid.slice(0, 8)}...) and initial supplier data.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useMemo } from 'react';
@@ -31,6 +30,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function ReportsPage() {
   const { data: projects, isLoading: projectsLoading } = useQuery({
@@ -47,12 +48,10 @@ export default function ReportsPage() {
   const analytics = useMemo(() => {
     if (!projects || !costingSets) return null;
 
-    // 1. Total Financials (Sum of winning costing sets)
     const totalRevenue = costingSets.reduce((sum, set) => sum + set.totalSellingSgd, 0);
     const totalProfit = costingSets.reduce((sum, set) => sum + set.profitSgd, 0);
     const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
-    // 2. Category Distribution
     const categories: Record<string, number> = {};
     projects.forEach(p => {
       const cat = p.category.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -65,7 +64,6 @@ export default function ReportsPage() {
       color: ['#2D5A69', '#61CCB3', '#FFA500', '#94a3b8', '#F43F5E'][idx % 5]
     }));
 
-    // 3. Performance Data (Revenue by month for last 6 months)
     const now = new Date();
     const performanceData = Array.from({ length: 6 }).map((_, i) => {
       const date = subMonths(now, 5 - i);
@@ -100,6 +98,80 @@ export default function ReportsPage() {
     };
   }, [projects, costingSets]);
 
+  const handleExportCSV = () => {
+    if (!projects) return;
+    
+    const headers = ['ID', 'Title', 'Customer', 'Category', 'Status', 'Created At'];
+    const rows = projects.map(p => [
+      p.id,
+      p.title,
+      p.customerDetails.name,
+      p.category,
+      p.status,
+      p.createdAt ? format(p.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `chrysalis_projects_export_${format(new Date(), 'yyyyMMdd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadReport = (reportName: string) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(45, 90, 105);
+    doc.text('CHRYSALIS TOURS SINGAPORE', 15, 20);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text(reportName.toUpperCase(), 15, 30);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated on: ${format(new Date(), 'dd MMM yyyy, HH:mm')}`, 15, 38);
+    
+    // Summary Section
+    if (analytics) {
+      doc.setFontSize(12);
+      doc.setTextColor(45, 90, 105);
+      doc.text('EXECUTIVE SUMMARY', 15, 55);
+      
+      autoTable(doc, {
+        startY: 60,
+        head: [['Metric', 'Value']],
+        body: [
+          ['Total Portfolio Value', `SGD ${analytics.totalRevenue.toLocaleString()}`],
+          ['Net Profit (Est)', `SGD ${analytics.totalProfit.toLocaleString()}`],
+          ['Average Margin', `${analytics.avgMargin.toFixed(2)}%`],
+          ['Total Projects', analytics.totalProjects.toString()],
+          ['Active Projects', analytics.activeProjects.toString()],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [45, 90, 105] }
+      });
+    }
+
+    // Footnote
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Internal Management Report | Page ${i} of ${pageCount}`, 15, 285);
+    }
+
+    doc.save(`${reportName.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+  };
+
   if (projectsLoading || costingLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -119,7 +191,7 @@ export default function ReportsPage() {
           <Button variant="outline" size="sm" className="gap-2">
             <Filter size={14} /> Filter Period
           </Button>
-          <Button size="sm" className="gap-2 bg-primary text-primary-foreground">
+          <Button size="sm" className="gap-2 bg-primary text-primary-foreground" onClick={handleExportCSV}>
             <Download size={14} /> Export CSV
           </Button>
         </div>
@@ -233,7 +305,7 @@ export default function ReportsPage() {
                     <p className="text-xs text-muted-foreground">{report.freq} • Shared with {report.recipients}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" className="gap-2">
+                <Button variant="ghost" size="sm" className="gap-2" onClick={() => handleDownloadReport(report.name)}>
                    <Download size={14} /> Download
                 </Button>
               </div>

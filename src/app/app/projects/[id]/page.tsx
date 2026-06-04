@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { use, useState } from 'react';
@@ -125,7 +124,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -158,7 +156,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Status Progress Stepper */}
       <Card className="border-none shadow-sm bg-white overflow-hidden">
         <CardContent className="p-6">
           <div className="relative flex justify-between items-center w-full">
@@ -358,10 +355,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                              <Info size={16} className="text-muted-foreground" />}
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm font-medium">
+                            <div className="text-sm font-medium">
                               {item.content}
                               {item.isAnomaly && <Badge className="ml-2 bg-orange-100 text-orange-700 hover:bg-orange-100 border-none h-4 text-[8px]">ANOMALY</Badge>}
-                            </p>
+                            </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <span className="font-bold text-foreground/80">{item.authorName}</span>
                               <span>•</span>

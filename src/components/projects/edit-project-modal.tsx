@@ -43,13 +43,24 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     summary: '',
   });
 
-  // ROOT CAUSE FIX: Defensive cleanup for pointer-events
-  // Some versions of Radix/ShadCN fail to cleanup body locks if state changes trigger unmounts
+  // ROOT CAUSE FIX: Defensive cleanup for Radix UI interaction lock
   useEffect(() => {
     if (!open) {
-      // Force interaction recovery
-      document.body.style.pointerEvents = 'auto';
-      document.body.style.overflow = 'auto';
+      // We use a small timeout to ensure we run AFTER Radix UI's own cleanup attempt
+      const timer = setTimeout(() => {
+        const body = document.body;
+        // Restore interaction
+        body.style.pointerEvents = 'auto';
+        body.style.overflow = 'auto';
+        // Remove Radix-specific locking attributes that might have been orphaned
+        body.removeAttribute('data-radix-scroll-lock');
+        // Clear aria-hidden if it was left on siblings (common blocker)
+        const main = document.querySelector('main');
+        if (main) main.removeAttribute('aria-hidden');
+        const sidebar = document.querySelector('aside');
+        if (sidebar) sidebar.removeAttribute('aria-hidden');
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 

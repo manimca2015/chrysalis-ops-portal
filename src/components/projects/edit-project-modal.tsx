@@ -34,6 +34,7 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Local state to keep the form data even if the 'project' prop is cleared during closing animation
   const [formData, setFormData] = useState({
     title: '',
     customerName: '',
@@ -43,8 +44,12 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     summary: '',
   });
 
+  // Track the project being edited to prevent content jumping during transitions
+  const [displayProject, setDisplayProject] = useState<Project | null>(null);
+
   useEffect(() => {
     if (project) {
+      setDisplayProject(project);
       setFormData({
         title: project.title || '',
         customerName: project.customerDetails?.name || '',
@@ -57,10 +62,10 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
   }, [project]);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => updateProject(project!.id, data),
+    mutationFn: (data: any) => updateProject(displayProject!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['project', project?.id] });
+      queryClient.invalidateQueries({ queryKey: ['project', displayProject?.id] });
       toast({ title: 'Success', description: 'Project updated successfully.' });
       onOpenChange(false);
     },
@@ -76,7 +81,7 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!project) return;
+    if (!displayProject) return;
     mutation.mutate({
       title: formData.title,
       customerDetails: {
@@ -91,99 +96,105 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl sm:max-w-[600px] overflow-y-auto max-h-[90vh]">
-        {project ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Edit Project Details</DialogTitle>
-            </DialogHeader>
+      <DialogContent 
+        className="max-w-2xl sm:max-w-[600px] overflow-y-auto max-h-[90vh]"
+        onPointerDownOutside={(e) => {
+          // If mutation is pending, prevent closing to avoid state desync
+          if (mutation.isPending) e.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Edit Project Details</DialogTitle>
+        </DialogHeader>
 
-            <div className="grid gap-6 py-4">
-              <form onSubmit={handleSubmit} className="grid gap-4">
+        {displayProject ? (
+          <div className="grid gap-6 py-4">
+            <form onSubmit={handleSubmit} className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-title">Project Title</Label>
+                <Input 
+                  id="edit-title" 
+                  placeholder="e.g. 5D4N Singapore Explorer" 
+                  value={formData.title}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-title">Project Title</Label>
+                  <Label htmlFor="edit-customerName">Customer Name</Label>
                   <Input 
-                    id="edit-title" 
-                    placeholder="e.g. 5D4N Singapore Explorer" 
-                    value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    id="edit-customerName" 
+                    value={formData.customerName}
+                    onChange={(e) => setFormData({...formData, customerName: e.target.value})}
                     required
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-customerName">Customer Name</Label>
-                    <Input 
-                      id="edit-customerName" 
-                      value={formData.customerName}
-                      onChange={(e) => setFormData({...formData, customerName: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-customerEmail">Customer Email</Label>
-                    <Input 
-                      id="edit-customerEmail" 
-                      type="email"
-                      value={formData.customerEmail}
-                      onChange={(e) => setFormData({...formData, customerEmail: e.target.value})}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-customerPhone">Phone Number</Label>
-                    <Input 
-                      id="edit-customerPhone" 
-                      value={formData.customerPhone}
-                      onChange={(e) => setFormData({...formData, customerPhone: e.target.value})}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-category">Category</Label>
-                    <Select 
-                      value={formData.category} 
-                      onValueChange={(v) => setFormData({...formData, category: v as any})}
-                    >
-                      <SelectTrigger id="edit-category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="custom-tour">Custom Tour</SelectItem>
-                        <SelectItem value="corporate">Corporate Event</SelectItem>
-                        <SelectItem value="transport">Transportation</SelectItem>
-                        <SelectItem value="education">Educational Tour</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-summary">Project Summary / Notes</Label>
-                  <Textarea 
-                    id="edit-summary" 
-                    placeholder="Details of the inquiry..." 
-                    className="min-h-[80px]"
-                    value={formData.summary}
-                    onChange={(e) => setFormData({...formData, summary: e.target.value})}
+                  <Label htmlFor="edit-customerEmail">Customer Email</Label>
+                  <Input 
+                    id="edit-customerEmail" 
+                    type="email"
+                    value={formData.customerEmail}
+                    onChange={(e) => setFormData({...formData, customerEmail: e.target.value})}
+                    required
                   />
                 </div>
+              </div>
 
-                <DialogFooter className="mt-4">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                  <Button type="submit" disabled={mutation.isPending}>
-                    {mutation.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </div>
-          </>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-customerPhone">Phone Number</Label>
+                  <Input 
+                    id="edit-customerPhone" 
+                    value={formData.customerPhone}
+                    onChange={(e) => setFormData({...formData, customerPhone: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-category">Category</Label>
+                  <Select 
+                    value={formData.category} 
+                    onValueChange={(v) => setFormData({...formData, category: v as any})}
+                  >
+                    <SelectTrigger id="edit-category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="custom-tour">Custom Tour</SelectItem>
+                      <SelectItem value="corporate">Corporate Event</SelectItem>
+                      <SelectItem value="transport">Transportation</SelectItem>
+                      <SelectItem value="education">Educational Tour</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-summary">Project Summary / Notes</Label>
+                <Textarea 
+                  id="edit-summary" 
+                  placeholder="Details of the inquiry..." 
+                  className="min-h-[80px]"
+                  value={formData.summary}
+                  onChange={(e) => setFormData({...formData, summary: e.target.value})}
+                />
+              </div>
+
+              <DialogFooter className="mt-4">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </div>
         ) : (
           <div className="py-12 text-center text-muted-foreground italic">
-            Loading project data...
+            Initializing...
           </div>
         )}
       </DialogContent>

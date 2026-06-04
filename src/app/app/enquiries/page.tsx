@@ -45,6 +45,10 @@ export default function EnquiriesPage() {
         });
       } catch (err: any) {
         console.error('AI Extraction Error:', err);
+        // Check for common quota/API errors
+        if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+          throw new Error('AI Quota Exceeded. Please check your Google AI Studio billing or wait a minute.');
+        }
         throw new Error(err.message || 'The AI could not process this email. Please check your configuration.');
       }
     },

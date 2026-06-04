@@ -26,6 +26,12 @@ const ProjectIntelligenceInputSchema = z.object({
 });
 export type ProjectIntelligenceInput = z.infer<typeof ProjectIntelligenceInputSchema>;
 
+const ProjectIntelligenceInternalInputSchema = ProjectIntelligenceInputSchema.extend({
+  isItinerary: z.boolean().optional(),
+  isFinancialAdvice: z.boolean().optional(),
+  isSummary: z.boolean().optional(),
+});
+
 const ProjectIntelligenceOutputSchema = z.object({
   content: z.string().describe('The AI generated content in Markdown format.'),
   keyTakeaways: z.array(z.string()).describe('Short bullet points for quick scanning.'),
@@ -40,13 +46,13 @@ export async function generateProjectInsights(input: ProjectIntelligenceInput): 
 const prompt = ai.definePrompt({
   name: 'projectIntelligencePrompt',
   model: 'googleai/gemini-2.5-flash',
-  input: {schema: ProjectIntelligenceInputSchema},
+  input: {schema: ProjectIntelligenceInternalInputSchema},
   output: {schema: ProjectIntelligenceOutputSchema},
   prompt: `You are an expert travel operations consultant for "Chrysalis Tours Singapore".
   
   TASK: Provide intelligence for the project "{{{projectTitle}}}" (Category: {{{category}}}).
   
-  {{#if (eq type "itinerary")}}
+  {{#if isItinerary}}
   GENERATE A DRAFT ITINERARY:
   Based on these notes: "{{{notes}}}"
   - Create a structured 3-day or multi-day itinerary.
@@ -54,7 +60,7 @@ const prompt = ai.definePrompt({
   - Keep the tone professional but exciting.
   {{/if}}
 
-  {{#if (eq type "financial_advice")}}
+  {{#if isFinancialAdvice}}
   ANALYZE FINANCIALS:
   Total Cost: SGD {{{costingData.totalCost}}}
   Total Selling: SGD {{{costingData.totalSelling}}}
@@ -69,7 +75,7 @@ const prompt = ai.definePrompt({
   - Flag any missing essential services typical for a {{{category}}} tour.
   {{/if}}
 
-  {{#if (eq type "summary")}}
+  {{#if isSummary}}
   PROJECT CATCH-UP SUMMARY:
   Notes: "{{{notes}}}"
   Status: Currently in planning phase.
@@ -88,7 +94,12 @@ const projectIntelligenceFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const {output} = await prompt(input);
+      const {output} = await prompt({
+        ...input,
+        isItinerary: input.type === 'itinerary',
+        isFinancialAdvice: input.type === 'financial_advice',
+        isSummary: input.type === 'summary',
+      });
       if (!output) throw new Error('AI failed to generate insights.');
       return output;
     } catch (error: any) {

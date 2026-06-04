@@ -6,6 +6,7 @@ export interface StaffProfile {
   email: string;
   name: string;
   role: MgmtRole;
+  status: 'active' | 'deactivated';
   avatarUrl?: string;
   createdAt: any;
   updatedAt: any;
@@ -25,22 +26,29 @@ export interface CustomerDetails {
   name: string;
   email: string;
   phone?: string;
+  preferences?: string[];
 }
 
 export interface ProjectAssignment {
   staffId: string;
   staffName: string;
-  role: 'Team Lead' | 'Assisting Member' | 'Senior Staff';
+  role: 'Senior Staff' | 'Team Lead' | 'Assisting Member';
 }
 
 export interface ProjectActivity {
   id: string;
-  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly' | 'questionnaire_sent' | 'bill_added' | 'payment_recorded';
+  type: 'status_change' | 'assignment' | 'note' | 'system' | 'document_sent' | 'task_update' | 'anomaly' | 'questionnaire_sent' | 'bill_added' | 'payment_recorded' | 'finalization';
   content: string;
   authorId: string;
   authorName: string;
   timestamp: any;
   isAnomaly?: boolean;
+}
+
+export interface RoomingConfig {
+  type: string;
+  quantity: number;
+  costPerRoom: number;
 }
 
 export interface Project {
@@ -51,7 +59,11 @@ export interface Project {
   teamAssignments: ProjectAssignment[];
   category: 'custom-tour' | 'corporate' | 'transport' | 'education';
   notes?: string;
-  chrysalisBookingId?: string;
+  provisionalPax: number;
+  actualPax?: number;
+  agreedPriceSgd?: number;
+  finalPriceSgd?: number;
+  roomingList?: RoomingConfig[];
   createdAt: any;
   updatedAt: any;
 }
@@ -106,16 +118,10 @@ export interface Task {
   status: 'pending' | 'ready_for_verification' | 'completed';
   priority: 'low' | 'medium' | 'high';
   dueDate?: any;
+  blockedBy?: string;
   subTasks: SubTask[];
   createdAt: any;
   updatedAt: any;
-}
-
-export interface SupplierService {
-  id: string;
-  name: string;
-  cost: number;
-  currency: string;
 }
 
 export interface Supplier {
@@ -126,7 +132,8 @@ export interface Supplier {
   email: string;
   phone: string;
   tags: string[];
-  services: SupplierService[];
+  operationalNotes?: { content: string; projectId: string; timestamp: any }[];
+  services: { id: string; name: string; cost: number; currency: string }[];
   updatedAt: any;
 }
 
@@ -135,7 +142,6 @@ export interface CostingItem {
   costingSetId: string;
   supplierId?: string;
   supplierName: string;
-  serviceId?: string;
   description: string;
   unitCost: number;
   quantity: number;
@@ -156,90 +162,18 @@ export interface CostingSet {
   totalSellingSgd: number;
   profitSgd: number;
   marginPercent: number;
-  exchangeRateManual?: number;
   createdAt: any;
   updatedAt: any;
 }
-
-export interface SupplierBill {
-  id: string;
-  projectId: string;
-  costingItemId: string;
-  supplierId: string;
-  supplierName: string;
-  invoiceNumber: string;
-  amount: number;
-  currency: string;
-  issueDate: any;
-  dueDate: any;
-  status: 'awaiting_payment' | 'paid' | 'overdue';
-  fileUrl?: string;
-  createdAt: any;
-}
-
-export interface SupplierPayment {
-  id: string;
-  billId: string;
-  amount: number;
-  date: any;
-  method: string;
-  proofUrl?: string;
-  recordedBy: string;
-  recordedByName: string;
-}
-
-export type DocumentType = 'quotation' | 'contract' | 'invoice' | 'receipt' | 'client_file';
-
-export interface DocumentMetadata {
-  id: string;
-  projectId: string;
-  type: DocumentType;
-  title: string;
-  fileUrl?: string;
-  status: 'draft' | 'sent' | 'signed' | 'paid' | 'uploaded';
-  recipientEmail: string;
-  version: number;
-  createdAt: any;
-  sentAt?: any;
-}
-
-export interface Installment {
-  label: string;
-  percentage: number;
-  amount: number;
-  dueDate?: any;
-  status: 'pending' | 'paid';
-}
-
-export interface PaymentPlan {
-  id: string;
-  projectId: string;
-  totalAmount: number;
-  currency: string;
-  installments: Installment[];
-  updatedAt: any;
-}
-
-export type AuditEventType = 
-  | 'auth_login' 
-  | 'auth_logout' 
-  | 'financial_override' 
-  | 'status_jump' 
-  | 'deletion' 
-  | 'settings_change' 
-  | 'clone_project'
-  | 'bill_created'
-  | 'supplier_payment'
-  | 'document_generated';
 
 export interface AuditEntry {
   id: string;
-  event: AuditEventType;
+  event: string;
   severity: 'info' | 'warning' | 'critical';
   projectId?: string;
   userId: string;
   userName: string;
   details: string;
-  metadata?: any;
+  changes?: { field: string; before: any; after: any };
   timestamp: any;
 }

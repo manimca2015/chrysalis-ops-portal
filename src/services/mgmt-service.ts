@@ -126,6 +126,14 @@ export const createProject = async (data: Omit<Project, 'id' | 'createdAt' | 'up
   return docRef;
 };
 
+export const updateProject = async (projectId: string, data: Partial<Project>) => {
+  const projectRef = doc(db, 'mgmt_projects', projectId);
+  return await updateDoc(projectRef, {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+};
+
 export const cloneProject = async (projectId: string, authorId: string, authorName: string) => {
   const original = await getProjectById(projectId);
   if (!original) throw new Error('Project not found');

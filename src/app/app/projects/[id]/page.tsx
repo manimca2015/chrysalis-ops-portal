@@ -45,7 +45,8 @@ import {
   FileIcon,
   Sparkles,
   Loader2,
-  Lightbulb
+  Lightbulb,
+  Edit3
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +55,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QuestionnaireModal } from '@/components/projects/questionnaire-modal';
+import { EditProjectModal } from '@/components/projects/edit-project-modal';
 
 const STATUS_STEPS: ProjectStatus[] = [
   'enquiry',
@@ -71,6 +73,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const queryClient = useQueryClient();
   const [aiInsight, setAiInsight] = useState<ProjectIntelligenceOutput | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
@@ -155,6 +158,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           <h1 className="text-3xl font-bold tracking-tight font-headline">{project.title}</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsEditModalOpen(true)}>
+            <Edit3 size={14} /> Edit Details
+          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => cloneMutation.mutate()} disabled={cloneMutation.isPending}>
             <Copy size={14} /> Clone Project
           </Button>
@@ -270,6 +276,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Mail size={12} /> {project.customerDetails.email}
                         </p>
+                        {project.customerDetails.phone && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock size={12} /> {project.customerDetails.phone}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -314,9 +325,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     </Button>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                       {project.notes}
-                    </p>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -480,6 +491,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </div>
       </div>
+
+      <EditProjectModal 
+        project={project} 
+        open={isEditModalOpen} 
+        onOpenChange={setIsEditModalOpen} 
+      />
     </div>
   );
 }

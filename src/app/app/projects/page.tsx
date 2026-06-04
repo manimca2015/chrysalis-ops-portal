@@ -1,8 +1,10 @@
 "use client"
 
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getProjects } from '@/services/mgmt-service';
 import { QuickAddProjectModal } from '@/components/projects/quick-add-modal';
+import { EditProjectModal } from '@/components/projects/edit-project-modal';
 import { 
   Table, 
   TableBody, 
@@ -17,7 +19,8 @@ import {
   Search, 
   Filter, 
   MoreHorizontal, 
-  ExternalLink 
+  ExternalLink,
+  Edit2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -30,8 +33,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { Project } from '@/types';
 
 export default function ProjectsPage() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: getProjects,
@@ -48,11 +55,17 @@ export default function ProjectsPage() {
     }
   };
 
+  const filteredProjects = projects?.filter(p => 
+    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.customerDetails.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.customerDetails.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight font-headline">Projects</h1>
+          <h1 className="text-3xl font-bold tracking-tight font-headline text-primary">Projects</h1>
           <p className="text-muted-foreground">Manage tour projects from enquiry to completion.</p>
         </div>
         <QuickAddProjectModal />
@@ -61,7 +74,12 @@ export default function ProjectsPage() {
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-          <Input placeholder="Search projects, customers..." className="pl-10" />
+          <Input 
+            placeholder="Search projects, customers..." 
+            className="pl-10" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
         <Button variant="outline" className="gap-2">
           <Filter size={18} />
@@ -86,31 +104,31 @@ export default function ProjectsPage() {
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">Loading projects...</TableCell>
               </TableRow>
-            ) : projects?.length === 0 ? (
+            ) : filteredProjects?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">No projects found. Create your first project using Quick Add.</TableCell>
+                <TableCell colSpan={6} className="h-24 text-center">No projects found.</TableCell>
               </TableRow>
-            ) : projects?.map((project) => (
+            ) : filteredProjects?.map((project) => (
               <TableRow key={project.id} className="hover:bg-muted/10 transition-colors">
                 <TableCell className="font-medium">
                   <div className="flex flex-col">
-                    <span>{project.title}</span>
-                    <span className="text-xs text-muted-foreground font-normal">ID: {project.id.slice(0, 8)}</span>
+                    <span className="font-bold">{project.title}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">ID: {project.id.slice(0, 8)}</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span>{project.customerDetails.name}</span>
-                    <span className="text-xs text-muted-foreground font-normal">{project.customerDetails.email}</span>
+                    <span className="text-sm font-semibold">{project.customerDetails.name}</span>
+                    <span className="text-xs text-muted-foreground">{project.customerDetails.email}</span>
                   </div>
                 </TableCell>
-                <TableCell className="capitalize">{project.category.replace('-', ' ')}</TableCell>
+                <TableCell className="capitalize text-xs font-medium">{project.category.replace('-', ' ')}</TableCell>
                 <TableCell>
-                  <Badge variant={getStatusVariant(project.status)} className="capitalize">
+                  <Badge variant={getStatusVariant(project.status)} className="capitalize text-[10px] h-5">
                     {project.status.replace('_', ' ')}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground text-xs">
                   {project.createdAt ? format(project.createdAt.toDate(), 'dd MMM yyyy') : '-'}
                 </TableCell>
                 <TableCell className="text-right">
@@ -121,15 +139,19 @@ export default function ProjectsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Actions</DropdownMenuLabel>
                       <DropdownMenuItem asChild>
-                        <Link href={`/app/projects/${project.id}`} className="flex items-center gap-2">
+                        <Link href={`/app/projects/${project.id}`} className="flex items-center gap-2 cursor-pointer">
                           <ExternalLink size={14} /> View Details
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>Edit Details</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setEditingProject(project)} className="flex items-center gap-2 cursor-pointer">
+                        <Edit2 size={14} /> Edit Details
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">Archive Project</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive flex items-center gap-2 cursor-pointer">
+                        Archive Project
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -138,6 +160,12 @@ export default function ProjectsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <EditProjectModal 
+        project={editingProject} 
+        open={!!editingProject} 
+        onOpenChange={(open) => !open && setEditingProject(null)} 
+      />
     </div>
   );
 }

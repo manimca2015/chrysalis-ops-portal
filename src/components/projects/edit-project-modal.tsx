@@ -43,23 +43,38 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     summary: '',
   });
 
-  // ROOT CAUSE FIX: Defensive cleanup for Radix UI interaction lock
+  // ROOT CAUSE FIX: Aggressive cleanup for interaction locks
   useEffect(() => {
     if (!open) {
-      // We use a small timeout to ensure we run AFTER Radix UI's own cleanup attempt
+      // Small delay to ensure we run AFTER Radix UI's closing transition completes
       const timer = setTimeout(() => {
         const body = document.body;
-        // Restore interaction
+        const html = document.documentElement;
+
+        // 1. Restore pointer events and overflow to the whole document
         body.style.pointerEvents = 'auto';
         body.style.overflow = 'auto';
-        // Remove Radix-specific locking attributes that might have been orphaned
+        html.style.pointerEvents = 'auto';
+        html.style.overflow = 'auto';
+
+        // 2. Remove specific Radix lock attributes
         body.removeAttribute('data-radix-scroll-lock');
-        // Clear aria-hidden if it was left on siblings (common blocker)
+        
+        // 3. Clear aria-hidden from application root elements
+        // This is crucial because Radix often marks siblings as hidden
         const main = document.querySelector('main');
         if (main) main.removeAttribute('aria-hidden');
         const sidebar = document.querySelector('aside');
         if (sidebar) sidebar.removeAttribute('aria-hidden');
-      }, 100);
+        
+        // 4. Force a generic interaction reset
+        const portals = document.querySelectorAll('[data-radix-portal]');
+        if (portals.length === 0) {
+           // If no portals are left, we definitely shouldn't be locked
+           body.style.setProperty('pointer-events', 'auto', 'important');
+        }
+      }, 150); 
+
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -117,6 +132,8 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="max-w-2xl sm:max-w-[600px] overflow-y-auto max-h-[90vh]"
+        // ROOT CAUSE FIX: Prevent focus restoration issues that block interaction
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle>Edit Project Details</DialogTitle>

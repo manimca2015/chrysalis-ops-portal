@@ -147,7 +147,14 @@ export default function ProjectsPage() {
                           <ExternalLink size={14} /> View Details
                         </Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEditingProject(project)} className="flex items-center gap-2 cursor-pointer">
+                      <DropdownMenuItem 
+                        // ROOT CAUSE FIX: Using onSelect with preventDefault ensures Dropdown cleanup doesn't clash with Dialog opening
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setEditingProject(project);
+                        }} 
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
                         <Edit2 size={14} /> Edit Details
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

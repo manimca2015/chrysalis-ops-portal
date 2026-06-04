@@ -8,9 +8,11 @@ import {
   createTask, 
   updateTask, 
   getProjectById,
-  getStaffProfiles
+  getStaffProfiles,
+  getTaskTemplates,
+  applyTaskTemplateToProject
 } from '@/services/mgmt-service';
-import { Task, SubTask } from '@/types';
+import { Task, SubTask, TaskTemplate } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +43,10 @@ import {
   User,
   MoreVertical,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Workflow,
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +60,9 @@ export default function ProjectTasksPage({ params }: { params: Promise<{ id: str
   const queryClient = useQueryClient();
 
   const [isAdding, setIsAdding] = useState(false);
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  
   const [formData, setFormData] = useState({
     title: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
@@ -76,6 +84,11 @@ export default function ProjectTasksPage({ params }: { params: Promise<{ id: str
     queryFn: getStaffProfiles,
   });
 
+  const { data: templates } = useQuery({
+    queryKey: ['task-templates'],
+    queryFn: getTaskTemplates
+  });
+
   const createTaskMutation = useMutation({
     mutationFn: (data: any) => createTask({
       ...data,
@@ -88,6 +101,17 @@ export default function ProjectTasksPage({ params }: { params: Promise<{ id: str
       setIsAdding(false);
       setFormData({ title: '', priority: 'medium', assignedToId: '' });
       toast({ title: 'Task Created' });
+    }
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: () => applyTaskTemplateToProject(id, selectedTemplateId, user?.uid || 'system', user?.email || 'System'),
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-activity', id] });
+      setIsApplyingTemplate(false);
+      setSelectedTemplateId('');
+      toast({ title: 'Template Applied', description: `Successfully added ${count} standard tasks.` });
     }
   });
 
@@ -119,65 +143,112 @@ export default function ProjectTasksPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
-        <Dialog open={isAdding} onOpenChange={setIsAdding}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus size={16} /> Add Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Task</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Task Title</Label>
-                <Input 
-                  placeholder="What needs to be done?" 
-                  value={formData.title} 
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex gap-2">
+          <Dialog open={isApplyingTemplate} onOpenChange={setIsApplyingTemplate}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 border-accent text-accent hover:bg-accent/5">
+                <Workflow size={16} /> Apply Template
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Apply Task Template</DialogTitle>
+                <DialogDescription>Choose a pre-defined checklist to populate your project tasks.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
                 <div className="space-y-2">
-                  <Label>Priority</Label>
-                  <Select 
-                    value={formData.priority} 
-                    onValueChange={v => setFormData({...formData, priority: v as any})}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Label>Standard Template</Label>
+                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                    <SelectTrigger><SelectValue placeholder="Select a template..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Assign To</Label>
-                  <Select 
-                    value={formData.assignedToId} 
-                    onValueChange={v => setFormData({...formData, assignedToId: v})}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Select staff..." /></SelectTrigger>
-                    <SelectContent>
-                      {staff?.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      {templates?.map(tpl => (
+                        <SelectItem key={tpl.id} value={tpl.id}>{tpl.title} ({tpl.tasks.length} tasks)</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                {selectedTemplateId && (
+                   <div className="p-3 bg-muted/30 rounded-md border space-y-2">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Preview Tasks</p>
+                      <ul className="text-xs space-y-1">
+                        {templates?.find(t => t.id === selectedTemplateId)?.tasks.map((t, i) => (
+                          <li key={i} className="flex items-center gap-2">
+                            <Zap size={10} className="text-accent" /> {t.title}
+                          </li>
+                        ))}
+                      </ul>
+                   </div>
+                )}
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
-              <Button onClick={() => createTaskMutation.mutate({
-                ...formData,
-                assignedToName: staff?.find(s => s.id === formData.assignedToId)?.name
-              })}>Create Task</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsApplyingTemplate(false)}>Cancel</Button>
+                <Button onClick={() => applyTemplateMutation.mutate()} disabled={!selectedTemplateId || applyTemplateMutation.isPending}>
+                  {applyTemplateMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : "Populate Checklist"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={isAdding} onOpenChange={setIsAdding}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus size={16} /> Add Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>New Task</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Task Title</Label>
+                  <Input 
+                    placeholder="What needs to be done?" 
+                    value={formData.title} 
+                    onChange={e => setFormData({...formData, title: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select 
+                      value={formData.priority} 
+                      onValueChange={v => setFormData({...formData, priority: v as any})}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assign To</Label>
+                    <Select 
+                      value={formData.assignedToId} 
+                      onValueChange={v => setFormData({...formData, assignedToId: v})}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select staff..." /></SelectTrigger>
+                      <SelectContent>
+                        {staff?.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button onClick={() => createTaskMutation.mutate({
+                  ...formData,
+                  assignedToName: staff?.find(s => s.id === formData.assignedToId)?.name
+                })}>Create Task</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

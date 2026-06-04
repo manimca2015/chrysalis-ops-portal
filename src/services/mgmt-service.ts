@@ -1,3 +1,4 @@
+
 import { initializeFirebase } from '@/firebase';
 import { 
   collection, 
@@ -14,7 +15,8 @@ import {
   arrayUnion,
   deleteDoc,
   Timestamp,
-  limit
+  limit,
+  writeBatch
 } from 'firebase/firestore';
 import { 
   Project, 
@@ -106,6 +108,51 @@ export const saveQuestionnaireTemplate = async (data: Omit<QuestionnaireTemplate
     ...data,
     updatedAt: serverTimestamp(),
   });
+};
+
+export const getTaskTemplates = async () => {
+  const q = query(collection(db, 'mgmt_task_templates'), orderBy('category', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TaskTemplate[];
+};
+
+export const saveTaskTemplate = async (data: Omit<TaskTemplate, 'id' | 'updatedAt'>) => {
+  return await addDoc(collection(db, 'mgmt_task_templates'), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const applyTaskTemplateToProject = async (projectId: string, templateId: string, authorId: string, authorName: string) => {
+  const templateSnap = await getDoc(doc(db, 'mgmt_task_templates', templateId));
+  if (!templateSnap.exists()) throw new Error('Template not found');
+  
+  const template = templateSnap.data() as TaskTemplate;
+  const batch = writeBatch(db);
+  
+  template.tasks.forEach(t => {
+    const taskRef = doc(collection(db, 'mgmt_tasks'));
+    batch.set(taskRef, {
+      projectId,
+      title: t.title,
+      priority: t.priority,
+      status: 'pending',
+      subTasks: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  });
+  
+  await batch.commit();
+  
+  await addProjectActivity(projectId, {
+    type: 'task_update',
+    content: `Applied task template: ${template.title} (${template.tasks.length} tasks added)`,
+    authorId,
+    authorName
+  });
+
+  return template.tasks.length;
 };
 
 // Projects

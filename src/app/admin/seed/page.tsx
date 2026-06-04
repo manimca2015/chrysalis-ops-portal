@@ -1,9 +1,10 @@
+
 "use client"
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { upsertStaffProfile, addSupplier } from '@/services/mgmt-service';
+import { upsertStaffProfile, addSupplier, saveTaskTemplate } from '@/services/mgmt-service';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -15,13 +16,12 @@ export default function SeedAdminPage() {
   const [success, setSuccess] = useState(false);
   const { toast } = useToast();
 
-  // This is the UID that the portal expects for the admin account
   const targetUid = 'O9vpTjrJXyX8G1dcZ5SwBnfCQ2l1';
 
   const handleSeed = async () => {
     setLoading(true);
     try {
-      // 1. Create the production user record (needed for the set-mgmt-claim API)
+      // 1. Create the production user record
       await setDoc(doc(db, 'users', targetUid), {
         email: 'admin@chrysalistours.sg',
         name: 'Chrysalis Admin',
@@ -38,7 +38,7 @@ export default function SeedAdminPage() {
         avatarUrl: 'https://picsum.photos/seed/admin/200/200'
       });
 
-      // 3. Seed demo suppliers for Module 3
+      // 3. Seed demo suppliers
       await addSupplier({
         name: 'Marina Bay Sands',
         location: 'Singapore',
@@ -52,23 +52,34 @@ export default function SeedAdminPage() {
         ]
       });
 
-      await addSupplier({
-        name: 'Chrysalis Transport',
-        location: 'Singapore',
-        contactPerson: 'Ah Huat',
-        email: 'transport@chrysalis.sg',
-        phone: '+65 9123 4567',
-        tags: ['transport', 'coach'],
-        services: [
-          { id: 'coach-45', name: '45-Seater Luxury Coach', cost: 350, currency: 'SGD' },
-          { id: 'van-13', name: '13-Seater Combi Van', cost: 180, currency: 'SGD' }
+      // 4. Seed Task Templates
+      await saveTaskTemplate({
+        title: 'Standard Educational Tour',
+        category: 'education',
+        tasks: [
+          { title: 'School Approval & MOE Documentation', priority: 'high', role: 'Team Lead' },
+          { title: 'Student Insurance Verification', priority: 'high', role: 'Staff' },
+          { title: 'Risk Assessment (RAMS) Drafting', priority: 'medium', role: 'Staff' },
+          { title: 'Dietary Requirements Mapping', priority: 'medium', role: 'Staff' },
+          { title: 'Coach Permit & Bus Bay Booking', priority: 'low', role: 'Staff' }
+        ]
+      });
+
+      await saveTaskTemplate({
+        title: 'Corporate Incentive Trip',
+        category: 'corporate',
+        tasks: [
+          { title: 'Dinner Venue Contract Signing', priority: 'high', role: 'Senior Staff' },
+          { title: 'Custom Merchandise / Branding Design', priority: 'medium', role: 'Staff' },
+          { title: 'Guest List & Flight Monitoring', priority: 'high', role: 'Staff' },
+          { title: 'Audio Visual (AV) Requirement Check', priority: 'medium', role: 'Staff' }
         ]
       });
 
       setSuccess(true);
       toast({
         title: "System Initialized",
-        description: `Admin profile, production user, and demo suppliers created.`,
+        description: `Admin, Suppliers, and Task Templates created.`,
       });
     } catch (error: any) {
       console.error('Seeding error:', error);
@@ -91,7 +102,7 @@ export default function SeedAdminPage() {
             System Initialization
           </CardTitle>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            This will set up the Admin account (UID: {targetUid.slice(0, 8)}...) and initial supplier data.
+            This will set up the Admin account, initial suppliers, and standard task templates.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState } from 'react';
@@ -58,6 +57,8 @@ export default function CRMPage() {
     const customerMap = new Map();
     
     projects.forEach(project => {
+      if (!project.customerDetails?.email) return;
+      
       const email = project.customerDetails.email.toLowerCase();
       if (!customerMap.has(email)) {
         customerMap.set(email, {
@@ -75,8 +76,8 @@ export default function CRMPage() {
     });
     
     return Array.from(customerMap.values()).filter(c => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      c.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (c.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
 
@@ -119,11 +120,11 @@ export default function CRMPage() {
                       <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 border-4 border-primary/5">
                           <AvatarFallback className="bg-primary/5 text-primary text-xl font-black">
-                            {customer.name.charAt(0)}
+                            {(customer.name || 'U').charAt(0)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <h3 className="text-xl font-bold">{customer.name}</h3>
+                          <h3 className="text-xl font-bold">{customer.name || 'Unknown Customer'}</h3>
                           <p className="text-sm text-muted-foreground">{customer.email}</p>
                         </div>
                       </div>
@@ -149,11 +150,11 @@ export default function CRMPage() {
                           <div key={p.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/50 transition-colors">
                             <div className="flex items-center gap-3">
                               <div className="h-2 w-2 rounded-full bg-primary" />
-                              <span className="text-sm font-medium">{p.title}</span>
-                              <Badge variant="secondary" className="text-[8px] h-4 uppercase">{p.status}</Badge>
+                              <span className="text-sm font-medium">{p.title || 'Untitled'}</span>
+                              <Badge variant="secondary" className="text-[8px] h-4 uppercase">{p.status || 'draft'}</Badge>
                             </div>
                             <span className="text-[10px] text-muted-foreground">
-                              {format(p.createdAt.toDate(), 'MMM yyyy')}
+                              {p.createdAt ? format(p.createdAt.toDate(), 'MMM yyyy') : '-'}
                             </span>
                           </div>
                         ))}
@@ -193,7 +194,7 @@ export default function CRMPage() {
                      )}
                    </div>
                    <div className="flex flex-wrap gap-1">
-                     {supplier.tags.map(t => <Badge key={t} variant="secondary" className="text-[9px]">{t}</Badge>)}
+                     {supplier.tags?.map(t => <Badge key={t} variant="secondary" className="text-[9px]">{t}</Badge>)}
                    </div>
                 </CardContent>
               </Card>

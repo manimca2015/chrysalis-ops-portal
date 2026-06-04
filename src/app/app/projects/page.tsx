@@ -55,11 +55,13 @@ export default function ProjectsPage() {
     }
   };
 
-  const filteredProjects = projects?.filter(p => 
-    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.customerDetails.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.customerDetails.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProjects = projects?.filter(p => {
+    const search = searchTerm.toLowerCase();
+    const titleMatch = p.title?.toLowerCase().includes(search);
+    const customerNameMatch = p.customerDetails?.name?.toLowerCase().includes(search);
+    const customerEmailMatch = p.customerDetails?.email?.toLowerCase().includes(search);
+    return titleMatch || customerNameMatch || customerEmailMatch;
+  });
 
   return (
     <div className="space-y-8">
@@ -112,20 +114,20 @@ export default function ProjectsPage() {
               <TableRow key={project.id} className="hover:bg-muted/10 transition-colors">
                 <TableCell className="font-medium">
                   <div className="flex flex-col">
-                    <span className="font-bold">{project.title}</span>
+                    <span className="font-bold">{project.title || 'Untitled Project'}</span>
                     <span className="text-[10px] text-muted-foreground font-mono">ID: {project.id.slice(0, 8)}</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold">{project.customerDetails.name}</span>
-                    <span className="text-xs text-muted-foreground">{project.customerDetails.email}</span>
+                    <span className="text-sm font-semibold">{project.customerDetails?.name || 'Unknown Customer'}</span>
+                    <span className="text-xs text-muted-foreground">{project.customerDetails?.email || 'No Email'}</span>
                   </div>
                 </TableCell>
-                <TableCell className="capitalize text-xs font-medium">{project.category.replace('-', ' ')}</TableCell>
+                <TableCell className="capitalize text-xs font-medium">{(project.category || 'custom-tour').replace('-', ' ')}</TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(project.status)} className="capitalize text-[10px] h-5">
-                    {project.status.replace('_', ' ')}
+                    {(project.status || 'draft').replace('_', ' ')}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-xs">

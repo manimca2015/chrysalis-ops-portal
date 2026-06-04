@@ -10,6 +10,7 @@ import {
   cloneProject,
   getDocuments
 } from '@/services/mgmt-service';
+import { generateProjectInsights, type ProjectIntelligenceOutput } from '@/ai/flows/ai-project-intelligence';
 import { ProjectStatus } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +42,10 @@ import {
   FileText,
   MessageSquarePlus,
   Download,
-  FileIcon
+  FileIcon,
+  Sparkles,
+  Loader2,
+  Lightbulb
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,6 +70,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [aiInsight, setAiInsight] = useState<ProjectIntelligenceOutput | null>(null);
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
@@ -102,6 +107,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     onSuccess: (newId) => {
       toast({ title: 'Project Cloned', description: 'Redirecting to the new project...' });
       router.push(`/app/projects/${newId}`);
+    }
+  });
+
+  const aiInsightMutation = useMutation({
+    mutationFn: (type: 'itinerary' | 'summary') => generateProjectInsights({
+      type,
+      projectTitle: project!.title,
+      category: project!.category,
+      notes: project!.notes
+    }),
+    onSuccess: (data) => {
+      setAiInsight(data);
+    },
+    onError: (err: any) => {
+      toast({ variant: 'destructive', title: 'AI Error', description: err.message });
     }
   });
 
@@ -199,6 +219,40 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
+              {aiInsight && (
+                <Card className="border-accent/30 bg-accent/5 shadow-sm relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="absolute top-0 right-0 p-4">
+                    <Button variant="ghost" size="icon" onClick={() => setAiInsight(null)} className="h-6 w-6">
+                      <ChevronRight className="rotate-90" size={14} />
+                    </Button>
+                  </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2 text-accent-foreground">
+                      <Sparkles size={16} /> Chrysalis AI Insight
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="prose prose-sm max-w-none text-xs leading-relaxed whitespace-pre-wrap">
+                      {aiInsight.content}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-accent/20">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-accent-foreground mb-1">Key Takeaways</p>
+                        <ul className="text-[10px] space-y-1 list-disc pl-4 text-muted-foreground">
+                          {aiInsight.keyTakeaways.map((k, i) => <li key={i}>{k}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-accent-foreground mb-1">Suggested Actions</p>
+                        <ul className="text-[10px] space-y-1 list-disc pl-4 text-muted-foreground">
+                          {aiInsight.suggestedActions.map((s, i) => <li key={i}>{s}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="shadow-sm">
                   <CardHeader className="pb-2">
@@ -246,8 +300,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
               {project.notes && (
                 <Card className="shadow-sm">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-sm">Enquiry Notes</CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 gap-2 text-accent"
+                      onClick={() => aiInsightMutation.mutate('summary')}
+                      disabled={aiInsightMutation.isPending}
+                    >
+                      {aiInsightMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Sparkles size={12} />}
+                      Summarize AI
+                    </Button>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -383,6 +447,18 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <CardDescription>Lifecycle Actions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <Button 
+                variant="outline" 
+                className="w-full justify-between group border-accent/30 bg-accent/5 hover:bg-accent/10"
+                onClick={() => aiInsightMutation.mutate('itinerary')}
+                disabled={aiInsightMutation.isPending}
+              >
+                <span className="flex items-center gap-2">
+                  {aiInsightMutation.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : <Sparkles className="text-accent" size={14} />}
+                  AI Itinerary Draft
+                </span>
+                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </Button>
               <QuestionnaireModal project={project} />
               
               <Button variant="outline" className="w-full justify-between group" asChild>

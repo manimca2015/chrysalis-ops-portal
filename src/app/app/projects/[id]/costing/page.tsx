@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { use, useState, useEffect } from 'react';
@@ -13,6 +12,7 @@ import {
   getSuppliers,
   duplicateCostingSet
 } from '@/services/mgmt-service';
+import { generateProjectInsights, type ProjectIntelligenceOutput } from '@/ai/flows/ai-project-intelligence';
 import { CostingSet, CostingItem, Supplier } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import {
   TableHead, 
   TableHeader, 
   TableRow 
-} from '@/components/ui/table';
+} from '@/table';
 import { 
   Select, 
   SelectContent, 
@@ -45,7 +45,9 @@ import {
   Copy,
   Receipt,
   CheckCircle2,
-  Info
+  Info,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -171,7 +173,7 @@ export default function ProjectCostingPage({ params }: { params: Promise<{ id: s
               </TabsList>
 
               <TabsContent value="costing">
-                <CostingWorkspace set={selectedSet} projectId={id} />
+                <CostingWorkspace set={selectedSet} project={project} />
               </TabsContent>
 
               <TabsContent value="bills">
@@ -193,12 +195,13 @@ export default function ProjectCostingPage({ params }: { params: Promise<{ id: s
   );
 }
 
-function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: string }) {
+function CostingWorkspace({ set, project }: { set: CostingSet, project: any }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [aiAdvice, setAiAdvice] = useState<ProjectIntelligenceOutput | null>(null);
   
   const [formData, setFormData] = useState({
     description: '',
@@ -219,6 +222,26 @@ function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: stri
   const { data: items, isLoading } = useQuery({
     queryKey: ['costing-items', set.id],
     queryFn: () => getCostingItems(set.id),
+  });
+
+  const aiAdviceMutation = useMutation({
+    mutationFn: () => generateProjectInsights({
+      type: 'financial_advice',
+      projectTitle: project.title,
+      category: project.category,
+      costingData: {
+        totalCost: set.totalCostSgd,
+        totalSelling: set.totalSellingSgd,
+        margin: set.marginPercent,
+        items: items?.map(i => ({ description: i.description, supplier: i.supplierName, cost: i.totalCostSgd }))
+      }
+    }),
+    onSuccess: (data) => {
+      setAiAdvice(data);
+    },
+    onError: (err: any) => {
+      toast({ variant: 'destructive', title: 'Advisor Error', description: err.message });
+    }
   });
 
   useEffect(() => {
@@ -248,7 +271,6 @@ function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: stri
 
   const addItemMutation = useMutation({
     mutationFn: (data: any) => {
-      // Use buffer for selling price exchange rate conversion
       const sellingExchangeRate = data.exchangeRate * EXCHANGE_RATE_BUFFER;
       const totalCostSgd = data.unitCost * data.quantity * data.exchangeRate;
       const sellingPriceSgd = (data.unitCost * data.quantity * (1 + data.markupPercent / 100)) * sellingExchangeRate;
@@ -262,7 +284,7 @@ function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: stri
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['costing-items', set.id] });
-      queryClient.invalidateQueries({ queryKey: ['costing-sets', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['costing-sets', project.id] });
       setIsAdding(false);
       resetForm();
       toast({ title: 'Line Item Added' });
@@ -273,7 +295,7 @@ function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: stri
     mutationFn: (itemId: string) => deleteCostingItem(set.id, itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['costing-items', set.id] });
-      queryClient.invalidateQueries({ queryKey: ['costing-sets', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['costing-sets', project.id] });
       toast({ title: 'Item Removed' });
     }
   });
@@ -316,15 +338,58 @@ function CostingWorkspace({ set, projectId }: { set: CostingSet, projectId: stri
         </Card>
       </div>
 
+      {aiAdvice && (
+        <Card className="bg-primary text-primary-foreground border-none shadow-md overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="h-1 bg-accent" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span className="flex items-center gap-2"><Sparkles size={16} className="text-accent" /> AI Financial Advisor</span>
+              <Button variant="ghost" size="icon" onClick={() => setAiAdvice(null)} className="h-6 w-6 text-white/50 hover:text-white"><ChevronRight className="rotate-90" size={14} /></Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-xs leading-relaxed whitespace-pre-wrap text-white/90">
+              {aiAdvice.content}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-white/10">
+              <div>
+                <p className="text-[10px] font-bold uppercase text-accent mb-1">Observation</p>
+                <ul className="text-[10px] space-y-1 list-disc pl-4 text-white/80">
+                  {aiAdvice.keyTakeaways.map((k, i) => <li key={i}>{k}</li>)}
+                </ul>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-accent mb-1">Recommended Changes</p>
+                <ul className="text-[10px] space-y-1 list-disc pl-4 text-white/80">
+                  {aiAdvice.suggestedActions.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="border-none shadow-sm overflow-hidden">
         <CardHeader className="bg-white flex flex-row items-center justify-between py-4">
           <div>
             <CardTitle className="text-lg">Financial Breakdown: {set.name}</CardTitle>
             <CardDescription className="text-xs">Manage suppliers, variations, and markups.</CardDescription>
           </div>
-          <Button onClick={() => setIsAdding(true)} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90" size="sm">
-            <Plus size={16} /> Add Supplier Service
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2 border-accent/30 text-accent hover:bg-accent/5" 
+              size="sm"
+              onClick={() => aiAdviceMutation.mutate()}
+              disabled={aiAdviceMutation.isPending || !items?.length}
+            >
+              {aiAdviceMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
+              AI Advisor
+            </Button>
+            <Button onClick={() => setIsAdding(true)} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90" size="sm">
+              <Plus size={16} /> Add Service
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           <Table>

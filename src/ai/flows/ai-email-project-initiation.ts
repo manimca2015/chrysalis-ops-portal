@@ -29,7 +29,7 @@ export async function initiateProjectFromEmail(input: EmailProjectInitiationInpu
 
 const prompt = ai.definePrompt({
   name: 'emailProjectInitiationPrompt',
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-2.5-flash',
   input: {schema: EmailProjectInitiationInputSchema},
   output: {schema: EmailProjectInitiationOutputSchema},
   prompt: `You are an AI assistant specialized in extracting key information from customer inquiry emails to facilitate project initiation for a tour company.
@@ -65,11 +65,11 @@ const emailProjectInitiationFlow = ai.defineFlow(
       
       // Handle quota and configuration errors gracefully
       if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-        throw new Error('AI Quota Exceeded. Please wait a minute before trying again.');
+        throw new Error('AI Quota Exceeded (Gemini 2.5 Flash). Please wait a minute before trying again or check your billing status.');
       }
       
       if (error.message?.includes('404')) {
-        throw new Error('AI Model not found (404). This might be a regional restriction or API configuration issue with the model identifier.');
+        throw new Error('AI Model gemini-2.5-flash not found. This might be a regional restriction or API configuration issue.');
       }
 
       throw new Error(error.message || 'The AI could not process this email.');

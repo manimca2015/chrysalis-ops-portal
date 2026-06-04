@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from 'next/link';
@@ -13,7 +12,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   LogOut,
-  Workflow
+  Workflow,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ const navItems = [
   { name: 'Enquiries', href: '/app/enquiries', icon: Mail },
   { name: 'Projects', href: '/app/projects', icon: FolderKanban },
   { name: 'CRM', href: '/app/crm', icon: Users },
+  { name: 'Reports', href: '/app/reports', icon: BarChart3 },
   { name: 'Admin', href: '/app/admin', icon: Settings },
 ];
 

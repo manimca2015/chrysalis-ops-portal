@@ -31,7 +31,8 @@ import {
   Settings2,
   FileQuestion,
   Plus,
-  Trash2
+  Trash2,
+  Save
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -64,7 +65,7 @@ export default function AdminSecurityPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questionnaire-templates'] });
       setNewTpl({ title: '', category: 'custom-tour', questions: [''] });
-      toast({ title: 'Template Saved' });
+      toast({ title: 'Template Saved', description: 'Your questionnaire template is ready to use.' });
     }
   });
 
@@ -175,7 +176,7 @@ export default function AdminSecurityPage() {
 
         <TabsContent value="templates">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <Card className="lg:col-span-1">
+            <Card className="lg:col-span-1 border-none shadow-sm">
               <CardHeader>
                 <CardTitle className="text-lg">Create Template</CardTitle>
                 <CardDescription>Add new questionnaire templates by category.</CardDescription>
@@ -186,8 +187,9 @@ export default function AdminSecurityPage() {
                   <Input value={newTpl.title} onChange={e => setNewTpl({...newTpl, title: e.target.value})} placeholder="e.g. Corporate Incentive Tour" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Input value={newTpl.category} onChange={e => setNewTpl({...newTpl, category: e.target.value})} placeholder="corporate, education, etc." />
+                  <Label>Category Slug</Label>
+                  <Input value={newTpl.category} onChange={e => setNewTpl({...newTpl, category: e.target.value})} placeholder="e.g. corporate, education" />
+                  <p className="text-[10px] text-muted-foreground">Use lowercase slugs for matching project categories.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Questions</Label>
@@ -197,28 +199,37 @@ export default function AdminSecurityPage() {
                         const qs = [...newTpl.questions];
                         qs[idx] = e.target.value;
                         setNewTpl({...newTpl, questions: qs});
-                      }} placeholder="Add a question..." />
+                      }} placeholder="e.g. What is your estimated budget?" />
                       <Button variant="ghost" size="icon" onClick={() => setNewTpl({...newTpl, questions: newTpl.questions.filter((_, i) => i !== idx)})}>
                         <Trash2 size={14} className="text-destructive" />
                       </Button>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" className="w-full gap-2" onClick={() => setNewTpl({...newTpl, questions: [...newTpl.questions, '']})}>
+                  <Button variant="outline" size="sm" className="w-full gap-2 border-dashed" onClick={() => setNewTpl({...newTpl, questions: [...newTpl.questions, '']})}>
                     <Plus size={14} /> Add Question
                   </Button>
                 </div>
-                <Button className="w-full" onClick={() => addTplMutation.mutate(newTpl as any)} disabled={!newTpl.title}>Save Template</Button>
+                <Button className="w-full gap-2" onClick={() => addTplMutation.mutate(newTpl as any)} disabled={!newTpl.title || addTplMutation.isPending}>
+                  <Save size={16} /> Save Template
+                </Button>
               </CardContent>
             </Card>
 
             <div className="lg:col-span-2 space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Existing Templates</h3>
-              {questionnaireTemplates?.map(tpl => (
-                <Card key={tpl.id} className="bg-white">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground px-1">Existing Templates</h3>
+              {questionnaireTemplates?.length === 0 ? (
+                <div className="py-20 text-center bg-white rounded-lg border border-dashed text-muted-foreground">
+                   No templates created yet.
+                </div>
+              ) : questionnaireTemplates?.map(tpl => (
+                <Card key={tpl.id} className="bg-white border-none shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between py-4">
                     <div>
-                      <CardTitle className="text-sm font-bold">{tpl.title}</CardTitle>
-                      <CardDescription className="text-xs">{tpl.questions.length} Questions • {tpl.category}</CardDescription>
+                      <div className="flex items-center gap-2 mb-1">
+                        <CardTitle className="text-sm font-bold">{tpl.title}</CardTitle>
+                        <Badge variant="secondary" className="text-[8px] h-4 uppercase">{tpl.category}</Badge>
+                      </div>
+                      <CardDescription className="text-xs">{tpl.questions.length} Questions</CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="pb-4">
@@ -234,7 +245,7 @@ export default function AdminSecurityPage() {
         </TabsContent>
 
         <TabsContent value="staff">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {staff?.map(person => (
               <Card key={person.id} className="shadow-sm border-none bg-white">
                 <CardContent className="pt-6">
@@ -246,7 +257,7 @@ export default function AdminSecurityPage() {
                       <h3 className="font-bold">{person.name}</h3>
                       <p className="text-xs text-muted-foreground">{person.email}</p>
                     </div>
-                    <Badge variant="outline" className="capitalize">{person.role}</Badge>
+                    <Badge variant="outline" className="capitalize text-[10px]">{person.role}</Badge>
                   </div>
                 </CardContent>
               </Card>

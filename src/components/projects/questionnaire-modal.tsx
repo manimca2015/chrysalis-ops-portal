@@ -22,12 +22,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { MessageSquarePlus, Mail, MessageCircle, Copy, Check } from 'lucide-react';
+import { MessageSquarePlus, Mail, MessageCircle, Copy, Check, Settings } from 'lucide-react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getQuestionnaireTemplates, addProjectActivity } from '@/services/mgmt-service';
 import { Project } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export function QuestionnaireModal({ project }: { project: Project }) {
   const [open, setOpen] = useState(false);
@@ -58,7 +59,10 @@ export function QuestionnaireModal({ project }: { project: Project }) {
 
   const handleGenerateDraft = () => {
     const questionsList = selectedQuestions.map(q => `• ${q}`).join('\n');
-    const greeting = `Hi ${project.customerDetails.name},\n\nThank you for reaching out to Chrysalis! To help us design the perfect ${project.category.replace('-', ' ')} for you, could you please provide a few more details?\n\n`;
+    const greeting = channel === 'email' 
+      ? `Subject: Regarding your ${project.category.replace('-', ' ')} Inquiry\n\nHi ${project.customerDetails.name},\n\nThank you for reaching out to Chrysalis! To help us design the perfect itinerary for you, could you please provide a few more details?\n\n`
+      : `Hi ${project.customerDetails.name}, this is ${user?.email?.split('@')[0] || 'Chrysalis Team'}. Regarding your tour enquiry, could you help us with these details?\n\n`;
+    
     const closing = `\n\nOnce we have this information, we'll start preparing a detailed proposal for you.\n\nBest regards,\n${user?.email?.split('@')[0] || 'Chrysalis Team'}`;
     
     setDraftMessage(greeting + questionsList + closing);
@@ -71,6 +75,8 @@ export function QuestionnaireModal({ project }: { project: Project }) {
     setOpen(false);
     setStep(1);
   };
+
+  const hasTemplates = templates && templates.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -85,7 +91,20 @@ export function QuestionnaireModal({ project }: { project: Project }) {
           <DialogDescription>Select template questions and draft a message for the client.</DialogDescription>
         </DialogHeader>
 
-        {step === 1 ? (
+        {!hasTemplates ? (
+          <div className="py-12 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <Settings className="text-muted-foreground" size={24} />
+            </div>
+            <div className="space-y-1">
+              <p className="font-bold">No templates found</p>
+              <p className="text-sm text-muted-foreground">You need to create a questionnaire template in the Admin panel first.</p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/app/admin">Go to Admin Settings</Link>
+            </Button>
+          </div>
+        ) : step === 1 ? (
           <div className="space-y-6 py-4">
             <div className="space-y-2">
               <Label>Select Template</Label>
@@ -108,7 +127,7 @@ export function QuestionnaireModal({ project }: { project: Project }) {
             {selectedTemplate && (
               <div className="space-y-3">
                 <Label>Select Questions to Include</Label>
-                <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-3">
+                <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-3 bg-muted/10">
                   {selectedTemplate.questions.map((q, i) => (
                     <div key={i} className="flex items-start gap-3 p-2 hover:bg-muted/50 rounded transition-colors">
                       <Checkbox 
@@ -119,7 +138,7 @@ export function QuestionnaireModal({ project }: { project: Project }) {
                           else setSelectedQuestions(selectedQuestions.filter(sq => sq !== q));
                         }}
                       />
-                      <label htmlFor={`q-${i}`} className="text-sm leading-none cursor-pointer">{q}</label>
+                      <label htmlFor={`q-${i}`} className="text-sm leading-tight cursor-pointer py-0.5">{q}</label>
                     </div>
                   ))}
                 </div>
@@ -150,36 +169,38 @@ export function QuestionnaireModal({ project }: { project: Project }) {
               <Textarea 
                 value={draftMessage} 
                 onChange={(e) => setDraftMessage(e.target.value)} 
-                className="min-h-[250px] text-xs leading-relaxed"
+                className="min-h-[250px] text-xs leading-relaxed font-mono bg-muted/5"
               />
             </div>
           </div>
         )}
 
-        <DialogFooter className="flex justify-between sm:justify-between w-full">
-          {step === 2 && (
-            <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-          )}
-          <div className="flex gap-2 ml-auto">
-            {step === 1 ? (
-              <Button onClick={handleGenerateDraft} disabled={!selectedTemplateId || selectedQuestions.length === 0}>
-                Next: Draft Message
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" className="gap-2" onClick={() => {
-                   navigator.clipboard.writeText(draftMessage);
-                   toast({ title: 'Copied to Clipboard' });
-                }}>
-                  <Copy size={14} /> Copy
+        {hasTemplates && (
+          <DialogFooter className="flex justify-between sm:justify-between w-full">
+            {step === 2 ? (
+              <Button variant="ghost" onClick={() => setStep(1)}>Back to Selection</Button>
+            ) : <div />}
+            <div className="flex gap-2">
+              {step === 1 ? (
+                <Button onClick={handleGenerateDraft} disabled={!selectedTemplateId || selectedQuestions.length === 0}>
+                  Next: Draft Message
                 </Button>
-                <Button className="gap-2" onClick={handleSend}>
-                  Mark as Sent <Check size={14} />
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogFooter>
+              ) : (
+                <>
+                  <Button variant="outline" className="gap-2" onClick={() => {
+                     navigator.clipboard.writeText(draftMessage);
+                     toast({ title: 'Copied', description: 'Draft copied to clipboard.' });
+                  }}>
+                    <Copy size={14} /> Copy
+                  </Button>
+                  <Button className="gap-2" onClick={handleSend}>
+                    Mark as Sent <Check size={14} />
+                  </Button>
+                </>
+              )}
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

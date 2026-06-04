@@ -30,6 +30,7 @@ export async function initiateProjectFromEmail(input: EmailProjectInitiationInpu
 
 const prompt = ai.definePrompt({
   name: 'emailProjectInitiationPrompt',
+  // Using the standard Genkit 1.x model identifier
   model: 'googleai/gemini-1.5-flash',
   input: {schema: EmailProjectInitiationInputSchema},
   output: {schema: EmailProjectInitiationOutputSchema},
@@ -55,10 +56,24 @@ const emailProjectInitiationFlow = ai.defineFlow(
     outputSchema: EmailProjectInitiationOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    if (!output) {
-      throw new Error('AI analysis failed to produce a valid response. Please ensure the email contains relevant inquiry text.');
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        throw new Error('AI analysis failed to produce a valid response. Please ensure the email contains relevant inquiry text.');
+      }
+      return output;
+    } catch (error: any) {
+      // If the specific model ID fails, try one more time with a slightly different alias
+      if (error.message?.includes('404')) {
+        console.warn('Primary model failed, attempting fallback...');
+        const {output} = await ai.generate({
+          model: 'googleai/gemini-1.5-flash-latest',
+          prompt: `Extract details from this email into JSON: ${input.emailContent}. Fields: customerName, customerEmail, customerPhone, projectSummary.`,
+          output: { schema: EmailProjectInitiationOutputSchema }
+        });
+        if (output) return output;
+      }
+      throw error;
     }
-    return output;
   }
 );

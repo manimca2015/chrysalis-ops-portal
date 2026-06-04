@@ -45,11 +45,19 @@ export default function EnquiriesPage() {
         });
       } catch (err: any) {
         console.error('AI Extraction Error:', err);
-        // Check for common quota/API errors
-        if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
-          throw new Error('AI Quota Exceeded. Please check your Google AI Studio billing or wait a minute.');
+        
+        // Detailed error messages for the user
+        let friendlyMessage = 'The AI could not process this email. Please check your configuration.';
+        
+        if (err.message?.includes('404')) {
+          friendlyMessage = 'AI Model not found (404). This usually means the model ID is incorrect or not available for your API key.';
+        } else if (err.message?.includes('429')) {
+          friendlyMessage = 'AI Quota Exceeded (429). Please wait a minute before trying again.';
+        } else if (err.message?.includes('API_KEY_INVALID')) {
+          friendlyMessage = 'Invalid API Key. Please check your GOOGLE_GENAI_API_KEY in .env.';
         }
-        throw new Error(err.message || 'The AI could not process this email. Please check your configuration.');
+
+        throw new Error(friendlyMessage);
       }
     },
     onSuccess: () => {

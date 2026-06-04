@@ -45,7 +45,7 @@ export async function generateProjectInsights(input: ProjectIntelligenceInput): 
 
 const prompt = ai.definePrompt({
   name: 'projectIntelligencePrompt',
-  model: 'googleai/gemini-1.5-flash',
+  model: 'googleai/gemini-2.5-flash',
   input: {schema: ProjectIntelligenceInternalInputSchema},
   output: {schema: ProjectIntelligenceOutputSchema},
   prompt: `You are an expert travel operations consultant for "Chrysalis Tours Singapore".

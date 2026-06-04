@@ -7,10 +7,9 @@ service cloud.firestore {
     }
 
     // Management portal staff profiles
-    // Allow users to manage their own profile, or admins to manage all profiles
+    // Allow authenticated users to read and write profiles
     match /mgmt_staff/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
     // Questionnaire and Task Templates

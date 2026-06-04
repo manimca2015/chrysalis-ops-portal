@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent that extracts customer details and project summary from an email to pre-fill a project initiation form.
@@ -10,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {gemini15Flash} from '@genkit-ai/google-genai';
 
 const EmailProjectInitiationInputSchema = z.object({
   emailContent: z.string().describe('The full content of the inquiry email.'),
@@ -30,8 +30,8 @@ export async function initiateProjectFromEmail(input: EmailProjectInitiationInpu
 
 const prompt = ai.definePrompt({
   name: 'emailProjectInitiationPrompt',
-  // Using the standard Genkit 1.x model identifier
-  model: 'googleai/gemini-1.5-flash',
+  // Using explicit model reference to avoid 404 name mismatches
+  model: gemini15Flash,
   input: {schema: EmailProjectInitiationInputSchema},
   output: {schema: EmailProjectInitiationOutputSchema},
   prompt: `You are an AI assistant specialized in extracting key information from customer inquiry emails to facilitate project initiation for a tour company.
@@ -63,17 +63,18 @@ const emailProjectInitiationFlow = ai.defineFlow(
       }
       return output;
     } catch (error: any) {
-      // If the specific model ID fails, try one more time with a slightly different alias
-      if (error.message?.includes('404')) {
-        console.warn('Primary model failed, attempting fallback...');
-        const {output} = await ai.generate({
-          model: 'googleai/gemini-1.5-flash-latest',
-          prompt: `Extract details from this email into JSON: ${input.emailContent}. Fields: customerName, customerEmail, customerPhone, projectSummary.`,
-          output: { schema: EmailProjectInitiationOutputSchema }
-        });
-        if (output) return output;
+      console.error('AI Flow Error:', error);
+      
+      // Handle quota and configuration errors gracefully
+      if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+        throw new Error('AI Quota Exceeded. Please wait a minute before trying again.');
       }
-      throw error;
+      
+      if (error.message?.includes('404')) {
+        throw new Error('AI Model not found. This might be a regional restriction or API configuration issue.');
+      }
+
+      throw new Error(error.message || 'The AI could not process this email.');
     }
   }
 );

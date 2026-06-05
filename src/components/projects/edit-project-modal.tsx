@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -43,38 +43,21 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     summary: '',
   });
 
-  // ROOT CAUSE FIX: Aggressive cleanup for interaction locks
+  // Root Cause Fix: Explicitly restore interaction on unmount or close
+  useLayoutEffect(() => {
+    return () => {
+      // Forcefully restore interaction if Radix fails to cleanup
+      document.body.style.pointerEvents = 'auto';
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
   useEffect(() => {
     if (!open) {
-      // Small delay to ensure we run AFTER Radix UI's closing transition completes
       const timer = setTimeout(() => {
-        const body = document.body;
-        const html = document.documentElement;
-
-        // 1. Restore pointer events and overflow to the whole document
-        body.style.pointerEvents = 'auto';
-        body.style.overflow = 'auto';
-        html.style.pointerEvents = 'auto';
-        html.style.overflow = 'auto';
-
-        // 2. Remove specific Radix lock attributes
-        body.removeAttribute('data-radix-scroll-lock');
-        
-        // 3. Clear aria-hidden from application root elements
-        // This is crucial because Radix often marks siblings as hidden
-        const main = document.querySelector('main');
-        if (main) main.removeAttribute('aria-hidden');
-        const sidebar = document.querySelector('aside');
-        if (sidebar) sidebar.removeAttribute('aria-hidden');
-        
-        // 4. Force a generic interaction reset
-        const portals = document.querySelectorAll('[data-radix-portal]');
-        if (portals.length === 0) {
-           // If no portals are left, we definitely shouldn't be locked
-           body.style.setProperty('pointer-events', 'auto', 'important');
-        }
-      }, 150); 
-
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'auto';
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -132,8 +115,11 @@ export function EditProjectModal({ project, open, onOpenChange }: EditProjectMod
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className="max-w-2xl sm:max-w-[600px] overflow-y-auto max-h-[90vh]"
-        // ROOT CAUSE FIX: Prevent focus restoration issues that block interaction
-        onCloseAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => {
+          // Prevent Radix from trying to restore focus to the unmounted/closed dropdown trigger
+          e.preventDefault();
+          document.body.style.pointerEvents = 'auto';
+        }}
       >
         <DialogHeader>
           <DialogTitle>Edit Project Details</DialogTitle>

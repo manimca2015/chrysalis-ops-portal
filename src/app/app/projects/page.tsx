@@ -148,7 +148,6 @@ export default function ProjectsPage() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        // ROOT CAUSE FIX: Using onSelect with preventDefault ensures Dropdown cleanup doesn't clash with Dialog opening
                         onSelect={(e) => {
                           e.preventDefault();
                           setEditingProject(project);
@@ -173,7 +172,12 @@ export default function ProjectsPage() {
       <EditProjectModal 
         project={editingProject} 
         open={!!editingProject} 
-        onOpenChange={(open) => !open && setEditingProject(null)} 
+        onOpenChange={(open) => {
+          if (!open) {
+            // Delay clearing the project state to allow Dialog closing animation/cleanup to complete
+            setTimeout(() => setEditingProject(null), 200);
+          }
+        }} 
       />
     </div>
   );

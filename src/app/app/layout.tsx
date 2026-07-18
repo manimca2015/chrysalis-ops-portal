@@ -15,11 +15,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      // Auth check disabled temporarily to allow dashboard access without login.
     }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="animate-spin text-primary" size={48} />
@@ -28,7 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   // Handle unauthorized staff access
-  if (error) {
+  if (user && error) {
     return (
       <div className="flex h-screen items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full border-destructive/20 shadow-lg">
